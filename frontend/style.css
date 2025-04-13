@@ -82,14 +82,14 @@ header {
     padding: 1em;
 }
 
-.itineraries, .progress {
+.itineraries {
     background-color: #C9E7FF;
     padding: 1em;
     border-radius: 12px;
-    width: 45%;
-    margin: 1em 0;
+    width: 90%;
+    margin: 1em auto;
 }
-
+  
 .card {
     background-color: #7AB1E4;
     padding: 1em;
