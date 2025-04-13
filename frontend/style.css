@@ -1,0 +1,159 @@
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #F2F8FF;
+    color: #2A4A77;
+    margin: 0;
+    padding: 0;
+}
+header {
+    background: linear-gradient(to bottom, #175EAD, #3E8ED0);
+    padding: 1em;
+    text-align: left;
+    color: white;
+}
+
+.rounded-box {
+    background-color: #C9E7FF;
+    border-radius: 16px;
+    padding: 1rem 2rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    margin: 1rem auto;
+    width: 90%;
+    color: #2A4A77;
+}
+
+.logo-grid {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    align-items: center;
+    gap: 1rem;
+}
+
+.logo-img img {
+    width: 100%;
+    max-width: 100px;
+    height: auto;
+}
+
+.logo-text h1 {
+    font-size: 2.5rem;
+    margin: 0;
+}
+
+.logo-text .tagline {
+    font-size: 1.2rem;
+    margin-top: 0.5rem;
+    color: #2A4A77;
+}
+
+.search-section {
+    display: flex;
+    justify-content: center;
+    margin: 1.5em auto;
+    gap: 1em;
+    background-color: #C9E7FF;
+    padding: 1em;
+    border-radius: 12px;
+    width: fit-content;
+}
+  
+.search-section input {
+    padding: 0.5em;
+    font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 200px;
+}
+  
+.search-section button {
+    background-color: #3E8ED0;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5em 1em;
+    cursor: pointer;
+}
+
+.content {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    padding: 1em;
+}
+
+.itineraries, .progress {
+    background-color: #C9E7FF;
+    padding: 1em;
+    border-radius: 12px;
+    width: 45%;
+    margin: 1em 0;
+}
+
+.card {
+    background-color: #7AB1E4;
+    padding: 1em;
+    border-radius: 8px;
+    margin-bottom: 1em;
+    color: #2A4A77;
+}
+
+.progress ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.step {
+    padding: 0.5em 0;
+    font-weight: bold;
+}
+
+.done {
+    color: green;
+}
+
+.failed {
+    color: red;
+}
+
+.promotions {
+    text-align: center;
+    margin-bottom: 2em;
+}
+
+.promo-card {
+    display: inline-block;
+    background-color: #3E8ED0;
+    color: white;
+    padding: 1em 2em;
+    border-radius: 8px;
+    margin: 0.5em;
+    font-size: 1.1em;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.login-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.login-form input {
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+}
+
+.login-form button {
+    background-color: #175EAD;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+  
+  
