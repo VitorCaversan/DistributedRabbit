@@ -5,12 +5,15 @@ if __name__ == "__main__":
     
     while True:
         choice = input("\n\nPlease select one of the following options:\n"
-                       "1. Consume from created reserve queue\n"
-                       "2. Call it a day\n")
+                       "1. Get from created reserve queue once\n"
+                       "2. Consume from created reserve queue once and remove from queue\n"
+                       "3. Call it a day\n")
         
         if choice == "1":
-            consumer.consume_created_reserve(consumer.std_callback)
+            consumer.get_once_created_reserve(consumer.std_callback_without_ack)
         elif choice == "2":
+            consumer.get_once_created_reserve(consumer.std_callback_with_ack)
+        elif choice == "3":
             print("Exiting...")
             break
         else:
