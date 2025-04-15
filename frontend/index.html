@@ -28,10 +28,12 @@
       
   <main>
     <section class="search-section">
-        <input type="text" id="searchBox" placeholder="Search cruises">
-        <button>Search</button>
+        <input type="text" id="destination" placeholder="Destination">
+        <input type="text" id="embarkPort" placeholder="Embarkation Port">
+        <input type="date" id="departureDate" placeholder="Departure Date">
+        <button onclick="handleSearch()">Search</button>
     </section>
-
+      
     <section class="content">
       <div class="itineraries">
         <h2>Cruise Itineraries</h2>

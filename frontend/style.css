@@ -50,12 +50,13 @@ header {
 .search-section {
     display: flex;
     justify-content: center;
-    margin: 1.5em auto;
+    flex-wrap: wrap;
     gap: 1em;
     background-color: #C9E7FF;
     padding: 1em;
     border-radius: 12px;
     width: fit-content;
+    margin: 1.5em auto;
 }
   
 .search-section input {
@@ -65,6 +66,7 @@ header {
     border-radius: 4px;
     width: 200px;
 }
+  
   
 .search-section button {
     background-color: #3E8ED0;
@@ -89,14 +91,33 @@ header {
     width: 90%;
     margin: 1em auto;
 }
-  
-.card {
-    background-color: #7AB1E4;
-    padding: 1em;
-    border-radius: 8px;
-    margin-bottom: 1em;
-    color: #2A4A77;
+
+.itineraries:empty {
+    display: none;
 }
+  
+  
+.card-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+  
+.card-info {
+    flex: 1;
+}
+  
+.card-action button {
+    background-color: #175EAD;
+    color: white;
+    border: none;
+    padding: 0.7em 1.2em;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+  
 
 .progress ul {
     list-style-type: none;
