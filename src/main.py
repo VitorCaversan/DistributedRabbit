@@ -1,11 +1,15 @@
 from msReserve import ReservationRequest, MSReserve
+from msPayment import MSPayment
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import threading
+import time
 
 # --- Flask Setup ---
 app = Flask(__name__)
 CORS(app)
 ms_reserve = MSReserve()
+ms_payment = MSPayment()
 
 @app.route('/reserve', methods=['POST'])
 def reserve():
@@ -27,5 +31,27 @@ def reserve():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def main():
+    """
+    Main function to run the Flask app and all the microservices in sepparate threads.
+    """
+    # Flask app
+    flask_thread = threading.Thread(target=app.run, kwargs={'port': 5000}).start()
+    # MSReserve
+    ms_reserve_thread = threading.Thread(target=ms_reserve.run, daemon=True).start()
+    # MSPayment
+    ms_payment_thread = threading.Thread(target=ms_payment.run, daemon=True).start()
+
+    while True:
+        try:
+            time.sleep(1)
+        except KeyboardInterrupt:
+            flask_thread.join()
+            ms_reserve.stop()
+            ms_reserve_thread.join()
+            ms_payment.stop()
+            ms_payment_thread.join()
+            break
+
 if __name__ == '__main__':
-    app.run(port=5000)
+    main()

@@ -1,0 +1,5 @@
+CREATED_RESERVE_NAME = "created_reserve"
+APPROVED_PAYMENT_NAME = "approved_payment"
+DENIED_PAYMENT_NAME = "denied_payment"
+TICKET_GENERATED_NAME = "ticket_generated"
+RABBITMQ_HOST = "localhost"
