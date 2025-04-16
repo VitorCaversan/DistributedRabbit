@@ -44,7 +44,16 @@
         "visited_places": ["test", "Neptune", "Pluton"],
         "nights": 12,
         "price": 1234
-      }      
+      },
+      {
+        "ship": "Poor Test Land",
+        "departure_dates": ["12/12/1234", "12/01/1234"],
+        "embark_port": "Test",
+        "return_port": "Test",
+        "visited_places": ["test", "Neptune", "Pluton"],
+        "nights": 12,
+        "price": 998
+      }
     ]
   }
   

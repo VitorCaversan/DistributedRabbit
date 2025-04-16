@@ -36,22 +36,28 @@ def main():
     Main function to run the Flask app and all the microservices in sepparate threads.
     """
     # Flask app
-    flask_thread = threading.Thread(target=app.run, kwargs={'port': 5000}).start()
+    flask_thread = threading.Thread(target=app.run, kwargs={'port': 5000, 'use_reloader': False, 'debug': False}, daemon=True)
     # MSReserve
-    ms_reserve_thread = threading.Thread(target=ms_reserve.run, daemon=True).start()
+    ms_reserve_thread = threading.Thread(target=ms_reserve.run, daemon=True)
     # MSPayment
-    ms_payment_thread = threading.Thread(target=ms_payment.run, daemon=True).start()
+    ms_payment_thread = threading.Thread(target=ms_payment.run, daemon=True)
+
+    # Start threads
+    flask_thread.start()
+    ms_reserve_thread.start()
+    ms_payment_thread.start()
 
     while True:
         try:
             time.sleep(1)
         except KeyboardInterrupt:
-            flask_thread.join()
             ms_reserve.stop()
+            flask_thread.join()
             ms_reserve_thread.join()
-            ms_payment.stop()
             ms_payment_thread.join()
             break
+
+    return 1
 
 if __name__ == '__main__':
     main()
