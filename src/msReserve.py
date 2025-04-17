@@ -34,10 +34,14 @@ class MSReserve:
         self.channel.queue_declare(queue=globalVars.DENIED_PAYMENT_NAME)
         self.channel.queue_declare(queue=globalVars.TICKET_GENERATED_NAME)
 
-        # Binds a queue to a fanout exchange
-        self.channel.exchange_declare(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE, exchange_type="fanout", durable=True)
+        # Binds a queue to a direct exchange
+        self.channel.exchange_declare(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE,
+                                      exchange_type="direct",
+                                      durable=True)
         self.channel.queue_declare(queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME, durable=True)
-        self.channel.queue_bind(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE, queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME)
+        self.channel.queue_bind(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE,
+                                queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME,
+                                routing_key=globalVars.APPROVED_PAYMENT_ROUTING_KEY)
 
     def reserve_cruise(self, reservation: ReservationRequest):
         message = json.dumps(asdict(reservation))

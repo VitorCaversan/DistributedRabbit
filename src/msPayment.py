@@ -14,7 +14,9 @@ class MSPayment:
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.host))
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=globalVars.CREATED_RESERVE_NAME)
-        self.channel.exchange_declare(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE, exchange_type='fanout', durable=True)
+        self.channel.exchange_declare(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE,
+                                      exchange_type='direct',
+                                      durable=True)
         self.channel.queue_declare(queue=globalVars.DENIED_PAYMENT_NAME)
 
     def run(self):
@@ -28,7 +30,7 @@ class MSPayment:
                 out_body = json.dumps(payload).encode('utf-8')
                 self.channel.basic_publish(
                     exchange="payment.status",   # fan‑out
-                    routing_key="",              # ignored by fanout
+                    routing_key=globalVars.APPROVED_PAYMENT_ROUTING_KEY,
                     body=out_body,
                     properties=pika.BasicProperties(
                         content_type="application/json",

@@ -5,3 +5,5 @@ APPROVED_PAYMENT_EXCHANGE = "payment.status"
 DENIED_PAYMENT_NAME = "denied_payment"
 TICKET_GENERATED_NAME = "ticket_generated"
 RABBITMQ_HOST = "localhost"
+
+APPROVED_PAYMENT_ROUTING_KEY = "payment.OK"
