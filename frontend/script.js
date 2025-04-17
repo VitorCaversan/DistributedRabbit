@@ -222,6 +222,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function reserveCruise(cruise) {
     const reservation = {
+        id: cruise.id,
         ship: cruise.ship,
         departure_date: cruise.departure_dates[0], 
         embark_port: cruise.embark_port,
@@ -242,7 +243,12 @@ fetch('http://localhost:5000/reserve', {
     })
     .then(response => response.json())
     .then(data => {
-        alert(`Reservation status: ${data.status}`);
+        if (!data.status) {
+          alert(`Reservation error: ${data.error}`)
+        }
+        else{
+          alert(`Reservation status: ${data.status}`);
+        }
     })
     .catch(err => {
         console.error('Error reserving cruise:', err);

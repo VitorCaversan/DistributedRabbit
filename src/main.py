@@ -1,5 +1,6 @@
 from msReserve import ReservationRequest, MSReserve
 from msPayment import MSPayment
+from msTicket import MSTicket
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import threading
@@ -10,12 +11,14 @@ app = Flask(__name__)
 CORS(app)
 ms_reserve = MSReserve()
 ms_payment = MSPayment()
+ms_ticket  = MSTicket()
 
 @app.route('/reserve', methods=['POST'])
 def reserve():
     try:
         data = request.get_json()
         reservation = ReservationRequest(
+            id=data['id'],
             ship=data['ship'],
             departure_date=data['departure_date'],
             embark_port=data['embark_port'],
@@ -41,11 +44,14 @@ def main():
     ms_reserve_thread = threading.Thread(target=ms_reserve.run, daemon=True)
     # MSPayment
     ms_payment_thread = threading.Thread(target=ms_payment.run, daemon=True)
+    # MSTicket
+    ms_ticket_thread = threading.Thread(target=ms_ticket.run, daemon=True)
 
     # Start threads
     flask_thread.start()
     ms_reserve_thread.start()
     ms_payment_thread.start()
+    ms_ticket_thread.start()
 
     while True:
         try:
@@ -55,6 +61,7 @@ def main():
             flask_thread.join()
             ms_reserve_thread.join()
             ms_payment_thread.join()
+            ms_ticket_thread.join()
             break
 
     return 1
