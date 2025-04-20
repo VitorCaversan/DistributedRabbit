@@ -29,7 +29,7 @@ class MSPayment:
                 payload = {"reserve_id": reservation.id, "status": "APPROVED"}
                 out_body = json.dumps(payload).encode('utf-8')
                 self.channel.basic_publish(
-                    exchange="payment.status",   # fan‑out
+                    exchange=globalVars.APPROVED_PAYMENT_EXCHANGE,
                     routing_key=globalVars.APPROVED_PAYMENT_ROUTING_KEY,
                     body=out_body,
                     properties=pika.BasicProperties(
