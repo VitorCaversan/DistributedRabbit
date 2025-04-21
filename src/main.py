@@ -1,17 +1,21 @@
 from msReserve import ReservationRequest, MSReserve
 from msPayment import MSPayment
 from msTicket import MSTicket
+from user import User
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import threading
 import time
+import json
 
 # --- Flask Setup ---
 app = Flask(__name__)
 CORS(app)
-ms_reserve = MSReserve()
-ms_payment = MSPayment()
-ms_ticket  = MSTicket()
+ms_reserve  = MSReserve()
+ms_payment  = MSPayment()
+ms_ticket   = MSTicket()
+main_user   = None
+user_thread = None
 
 @app.route('/reserve', methods=['POST'])
 def reserve():
@@ -33,6 +37,24 @@ def reserve():
         return jsonify({"status": "Reservation created and published!"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/login', methods=['POST'])
+def login():
+    payload = request.get_json()
+    user_id = payload.get('id')
+
+    global main_user
+    global user_thread
+
+    if user_id > 0 and not main_user:
+        main_user = User(user_id=user_id)
+        user_thread = threading.Thread(target=main_user.run, daemon=True)
+        user_thread.start()
+
+    if user_id < 1 or not main_user:
+        return jsonify({'status': 'error', 'error': 'User could not be created'}), 404
+
+    return jsonify({'status': 'success'})
 
 def main():
     """
@@ -62,6 +84,10 @@ def main():
             ms_reserve_thread.join()
             ms_payment_thread.join()
             ms_ticket_thread.join()
+            if user_thread:
+                user_thread.join()
+            if main_user:
+                main_user.stop()
             break
 
     return 1
