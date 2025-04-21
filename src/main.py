@@ -4,9 +4,12 @@ from msTicket import MSTicket
 from user import User
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from wsgiref.simple_server import make_server
 import threading
+import signal
+import sys
 import time
-import json
+import socket
 
 # --- Flask Setup ---
 app = Flask(__name__)
@@ -60,8 +63,11 @@ def main():
     """
     Main function to run the Flask app and all the microservices in sepparate threads.
     """
+    # Make a WSGI server around Flask app
+    httpd = make_server('localhost', 5000, app)
+
     # Flask app
-    flask_thread = threading.Thread(target=app.run, kwargs={'port': 5000, 'use_reloader': False, 'debug': False}, daemon=True)
+    flask_thread = threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1), daemon=True)
     # MSReserve
     ms_reserve_thread = threading.Thread(target=ms_reserve.run, daemon=True)
     # MSPayment
@@ -69,28 +75,61 @@ def main():
     # MSTicket
     ms_ticket_thread = threading.Thread(target=ms_ticket.run, daemon=True)
 
-    # Start threads
-    flask_thread.start()
-    ms_reserve_thread.start()
-    ms_payment_thread.start()
-    ms_ticket_thread.start()
-
-    while True:
+    # Shutdown logic
+    def _shutdown(sig, frame):
+        print("\n🛑 SIGINT received, shutting down…")
+        # stop consuming on each service
+        ms_reserve.stop()
+        ms_payment.stop()
+        ms_ticket.stop()
+        if main_user:
+            main_user.stop()
+        # stop the HTTP server
+        # wake the HTTP server's select() so shutdown() can return
         try:
-            time.sleep(1)
-        except KeyboardInterrupt:
-            ms_reserve.stop()
-            flask_thread.join()
-            ms_reserve_thread.join()
-            ms_payment_thread.join()
-            ms_ticket_thread.join()
-            if user_thread:
-                user_thread.join()
-            if main_user:
-                main_user.stop()
-            break
+            sock = socket.create_connection(('localhost', 5000), timeout=1)
+            sock.close()
+        except:
+            pass
+        httpd.shutdown()
 
-    return 1
+    signal.signal(signal.SIGINT, _shutdown)
+
+    # Start threads
+    for t in (flask_thread, ms_reserve_thread, ms_payment_thread, ms_ticket_thread):
+        t.start()
+
+    try:
+        while True:
+            time.sleep(0.5)
+    except KeyboardInterrupt: # If signal.SIGINT is not working
+        # This is a fallback in case the signal handler doesn't work
+        print("\n🛑  SIGINT received, shutting down…")
+        ms_reserve.stop()
+        ms_payment.stop()
+        ms_ticket.stop()
+        if main_user:
+            main_user.stop()
+
+        # wake the HTTP server's select() so shutdown() can return
+        try:
+            sock = socket.create_connection(('localhost', 5000), timeout=1)
+            sock.close()
+        except:
+            pass
+        httpd.shutdown()
+
+    # Wait for threads to finish
+    for t in (flask_thread, ms_reserve_thread, ms_payment_thread, ms_ticket_thread):
+        print(f"Waiting for {t.name} to finish...")
+        t.join()
+
+    if user_thread:
+        print(f"Waiting for {user_thread.name} to finish...")
+        user_thread.join()
+
+    print("✅ All services stopped cleanly.")
+    sys.exit(0)
 
 if __name__ == '__main__':
     main()

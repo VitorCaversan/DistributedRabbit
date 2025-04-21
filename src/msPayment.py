@@ -44,9 +44,19 @@ class MSPayment:
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
         self.channel.basic_consume(queue=globalVars.CREATED_RESERVE_NAME, on_message_callback=on_created_reserve)
-        print("[Payment MS] Listening on created_reserve...")
-        self.channel.start_consuming()
+        
+        try:
+            print("[Payment MS] Listening on all queues")
+            self.channel.start_consuming()
+        except pika.exceptions.ConnectionsClosed:
+            pass
+        except pika.exceptions.ConnectionWrongStateError:
+            pass
+        finally:
+            self.channel.close()
+            self.connection.close()
+            print("[Payment MS] Connection closed.")
     
     def stop(self):
-        self.connection.close()
-        print("[Payment MS] Connection closed.")
+        # thread‑safe way to break out of start_consuming
+        self.connection.add_callback_threadsafe(self.channel.stop_consuming)

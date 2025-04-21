@@ -64,44 +64,52 @@ class User:
             queue_name = globalVars.PROMOTION_QUEUE_NAME + str(cruise_id)
             self.channel.basic_consume(queue=queue_name, on_message_callback=self.on_promotion)
 
-        print("[User MS] Listening for promotions...")
-        self.channel.start_consuming()
+        try:
+            print("[User] Listening on all queues")
+            self.channel.start_consuming()
+        except pika.exceptions.ConnectionsClosed:
+            pass
+        except pika.exceptions.ConnectionWrongStateError:
+            pass
+        finally:
+            self.channel.close()
+            self.connection.close()
+            print("[User] Connection closed.")
 
     def subscribe_to_promotion(self, cruise_id):
-        """
-        Subscribes to the promotions for a specific cruise ID and adds this id
-        on the cruises_interests array on the users json.
-        """
-        # Channel subscription
-        self.channel.stop_consuming()
+        def do_subscribe():
+            """
+            Subscribes to the promotions for a specific cruise ID and adds this id
+            on the cruises_interests array on the users json.
+            """
+            exchange_name = globalVars.PROMOTION_EXCHANGE_NAME + str(cruise_id)
+            queue_name = globalVars.PROMOTION_QUEUE_NAME + str(cruise_id)
+            self.channel.queue_declare(queue=queue_name, durable=True)
+            self.channel.queue_bind(exchange=exchange_name,
+                                    queue=queue_name,
+                                    routing_key=globalVars.PROMOTIONS_ROUTING_KEY)
+            self.channel.basic_consume(queue=queue_name, on_message_callback=self.on_promotion)
 
-        exchange_name = globalVars.PROMOTION_EXCHANGE_NAME + str(cruise_id)
-        queue_name = globalVars.PROMOTION_QUEUE_NAME + str(cruise_id)
-        self.channel.queue_declare(queue=queue_name, durable=True)
-        self.channel.queue_bind(exchange=exchange_name,
-                                queue=queue_name,
-                                routing_key=globalVars.PROMOTIONS_ROUTING_KEY)
-        self.channel.basic_consume(queue=queue_name, on_message_callback=self.on_promotion)
+            # Update user JSON
+            with open('../databank/users.json', 'r') as file:
+                data = json.load(file)
+                users = data.get('users', [])
+            users = users if isinstance(users, list) else []
 
-        self.channel.start_consuming()
+            for user in users:
+                if user['id'] == self.user_id:
+                    user['cruises_interests'].append(cruise_id)
+                    print(f"[User MS] User ID {self.user_id} subscribed to cruise ID {cruise_id}")
+                    break
+            else:
+                print(f"[User MS] User ID {self.user_id} not found in users.json")
 
-        # Update user JSON
-        with open('../databank/users.json', 'r') as file:
-            data = json.load(file)
-            users = data.get('users', [])
-        users = users if isinstance(users, list) else []
+            with open('../databank/users.json', 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
 
-        for user in users:
-            if user['id'] == self.user_id:
-                user['cruises_interests'].append(cruise_id)
-                print(f"[User MS] User ID {self.user_id} subscribed to cruise ID {cruise_id}")
-                break
-        else:
-            print(f"[User MS] User ID {self.user_id} not found in users.json")
-
-        with open('../databank/users.json', 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        # Thread-safe way to subscribe to a new queue and bind it to the exchange
+        self.connection.add_callback_threadsafe(do_subscribe)
 
     def stop(self):
-        self.connection.close()
-        print("[User MS] Connection closed.")
+        # thread‑safe way to break out of start_consuming
+        self.connection.add_callback_threadsafe(self.channel.stop_consuming)

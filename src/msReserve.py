@@ -66,9 +66,19 @@ class MSReserve:
         self.channel.basic_consume(queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME, on_message_callback=on_approved_payment, auto_ack=False)
         self.channel.basic_consume(queue=globalVars.DENIED_PAYMENT_NAME, on_message_callback=on_denied_payment)
         self.channel.basic_consume(queue=globalVars.TICKET_GENERATED_NAME, on_message_callback=on_ticket_generated)
-        print("[Reserve MS] Listening on all queues")
-        self.channel.start_consuming()
+        
+        try:
+            print("[Reserve MS] Listening on all queues")
+            self.channel.start_consuming()
+        except pika.exceptions.ConnectionsClosed:
+            pass
+        except pika.exceptions.ConnectionWrongStateError:
+            pass
+        finally:
+            self.channel.close()
+            self.connection.close()
+            print("[Reserve MS] Connection closed.")
     
     def stop(self):
-        self.connection.close()
-        print("[Reserve MS] Connection closed.")
+        # thread‑safe way to break out of start_consuming
+        self.connection.add_callback_threadsafe(self.channel.stop_consuming)
