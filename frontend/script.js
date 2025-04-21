@@ -79,35 +79,6 @@ function handleSearch() {
     renderItineraries(filtered);
 }
 
-async function login() {
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-
-  const res = await fetch('../databank/users.json');
-  const data = await res.json();
-
-  const user = data.users.find(u => u.username === username && u.password === password);
-
-  if (user) {
-    sessionStorage.setItem('loggedInUser', JSON.stringify(user));
-    alert(`Welcome, ${user.username}!`);
-    location.reload();
-  } else {
-    alert('Invalid credentials');
-  }
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  loadItineraries();
-
-  const user = JSON.parse(sessionStorage.getItem('loggedInUser'));
-  if (user) {
-    document.querySelector('.login-form').innerHTML = `
-      <p>Logged in as <strong>${user.username}</strong></p>
-    `;
-  }
-});
-
 let cruiseData = [];
 
 async function loadItineraries() {
@@ -200,13 +171,38 @@ async function login() {
 
   const user = data.users.find(u => u.username === username && u.password === password);
 
-  if (user) {
-    sessionStorage.setItem('loggedInUser', JSON.stringify(user));
-    alert(`Welcome, ${user.username}!`);
-    location.reload();
-  } else {
+  if (!user) {
     alert('Invalid credentials');
+    return;
   }
+
+  // Storing locally
+  sessionStorage.setItem('loggedInUser', JSON.stringify(user));
+
+  // Sendin { id } to Flask backend
+  fetch('http://localhost:5000/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    // here’s the “tuple” you asked for:
+    body: JSON.stringify({ id: user.id })
+  })
+    .then(resp => resp.json())
+    .then(payload => {
+      if (payload.status === 'success') {
+        alert(`Welcome, ${user.username}!`);
+        // now your Flask session (or whatever) is set,
+        // so you can reload or redirect:
+        location.reload();
+      } else {
+        alert(`Login failed: ${payload.error}`);
+      }
+    })
+    .catch(err => {
+      console.error('Error talking to server:', err);
+      alert('Could not log in.');
+    });
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -222,6 +218,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function reserveCruise(cruise) {
     const reservation = {
+        id: cruise.id,
         ship: cruise.ship,
         departure_date: cruise.departure_dates[0], 
         embark_port: cruise.embark_port,
@@ -242,7 +239,12 @@ fetch('http://localhost:5000/reserve', {
     })
     .then(response => response.json())
     .then(data => {
-        alert(`Reservation status: ${data.status}`);
+        if (!data.status) {
+          alert(`Reservation error: ${data.error}`)
+        }
+        else{
+          alert(`Reservation status: ${data.status}`);
+        }
     })
     .catch(err => {
         console.error('Error reserving cruise:', err);

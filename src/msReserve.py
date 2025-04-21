@@ -6,6 +6,7 @@ import pika
 
 @dataclass
 class ReservationRequest:
+    id: int
     ship: str
     departure_date: str
     embark_port: str
@@ -28,10 +29,19 @@ class MSReserve:
         self.host = host
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.host))
         self.channel = self.connection.channel()
+
         self.channel.queue_declare(queue=globalVars.CREATED_RESERVE_NAME)
-        self.channel.queue_declare(queue=globalVars.APPROVED_PAYMENT_NAME)
         self.channel.queue_declare(queue=globalVars.DENIED_PAYMENT_NAME)
         self.channel.queue_declare(queue=globalVars.TICKET_GENERATED_NAME)
+
+        # Binds a queue to a direct exchange
+        self.channel.exchange_declare(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE,
+                                      exchange_type="direct",
+                                      durable=True)
+        self.channel.queue_declare(queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME, durable=True)
+        self.channel.queue_bind(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE,
+                                queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME,
+                                routing_key=globalVars.APPROVED_PAYMENT_ROUTING_KEY)
 
     def reserve_cruise(self, reservation: ReservationRequest):
         message = json.dumps(asdict(reservation))
@@ -42,16 +52,21 @@ class MSReserve:
 
     def run(self):
         def on_approved_payment(ch, method, properties, body):
-            print(f"[Reserve MS] Payment approved: {body.decode('utf-8')}")
+            print(f"[Reserve MS] Received: {json.loads(body.decode('utf-8'))}")
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
         def on_denied_payment(ch, method, properties, body):
-            print(f"[Reserve MS] Payment denied: {body.decode('utf-8')}")
+            print(f"[Reserve MS] Received: {json.loads(body.decode('utf-8'))}")
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
-        self.channel.basic_consume(queue=globalVars.APPROVED_PAYMENT_NAME, on_message_callback=on_approved_payment)
+        def on_ticket_generated(ch, method, properties, body):
+            print(f"[Reserve MS] Ticket generated: {body.decode('utf-8')}")
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        self.channel.basic_consume(queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME, on_message_callback=on_approved_payment, auto_ack=False)
         self.channel.basic_consume(queue=globalVars.DENIED_PAYMENT_NAME, on_message_callback=on_denied_payment)
-        print("[Reserve MS] Listening on approved_payment and denied_payment...")
+        self.channel.basic_consume(queue=globalVars.TICKET_GENERATED_NAME, on_message_callback=on_ticket_generated)
+        print("[Reserve MS] Listening on all queues")
         self.channel.start_consuming()
     
     def stop(self):
