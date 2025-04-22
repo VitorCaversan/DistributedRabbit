@@ -1,4 +1,5 @@
 # ms_reserve.py
+from verif_signature import verify_sig, InvalidSignature
 from dataclasses import dataclass, asdict
 import globalVars
 import json
@@ -52,8 +53,13 @@ class MSReserve:
 
     def run(self):
         def on_approved_payment(ch, method, properties, body):
-            print(f"[Reserve MS] Received: {json.loads(body.decode('utf-8'))}")
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+            try:
+                event = verify_sig(body, properties.headers or {})
+                print("[Reserve MS] verified:", event)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            except InvalidSignature:
+                print("[Reserve MS] Signature check failed")
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
         def on_denied_payment(ch, method, properties, body):
             print(f"[Reserve MS] Received: {json.loads(body.decode('utf-8'))}")

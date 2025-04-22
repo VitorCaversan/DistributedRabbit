@@ -73,11 +73,44 @@ The user interface allows:
 - Viewing promotional offers by destination  
 
 ## Running the System
+### Dependencies
+**Technologies:**
+ - Python 3.7+
+ - RabbitMQ (via Docker or local install)
+ - Docker & Docker Compose (optional for container-based deployment)
 
-1. Start the RabbitMQ broker.
-2. Run each microservice independently (ensure they are connected to RabbitMQ).
-3. Use the UI to interact with the services.
-4. Monitor logs for event flow and signature verification.
+**Required Python packages:**
+```bash
+pip install pika flask flask_cors cryptography
+```
+
+### Running project locally
+1. Ensure RabbitMQ is running locally or via Docker.
+2. Clone the repository:
+   ```bash
+   git clone
+   ```
+3. Run **ONLY ONCE** the following script to create the asymmetric keys:
+   ```bash
+   python keygen_ed25519.py
+   ```
+4. Navigate to the project src directory:
+   ```bash
+   cd src
+   ```
+5. Run main.py to start the microservices:
+   ```bash
+   python main.py
+   ```
+6. Access the UI at `http://localhost:5000` or by running live server on VSCode.
+7. Use the UI to interact with the system, search for cruises, make reservations, and view promotions.
+8. Monitor RabbitMQ management interface at `http://localhost:15672` (default credentials: guest/guest).
+9. Use the management interface to view queues, messages, and service interactions.
+10. To stop the services, terminate the Python processes or use `Ctrl+C` in the terminal.
+11. If needed to send promotional messages, run the `msPromotions.py` script in a separate terminal:
+    ```bash
+    python msPromotions.py
+    ```
 
 ## License
 
