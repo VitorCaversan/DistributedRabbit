@@ -1,4 +1,5 @@
 # ms_reserve.py
+from verif_signature import verify_sig, InvalidSignature
 import globalVars
 import json
 import pika
@@ -25,10 +26,14 @@ class MSTicket:
 
     def run(self):
         def on_approved_payment(ch, method, properties, body):
-            print(f"[Ticket MS] Received: {json.loads(body.decode('utf-8'))}")
-
-            ch.basic_publish(exchange='', routing_key=globalVars.TICKET_GENERATED_NAME, body='Ticket generated!')
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+            try:
+                event = verify_sig(body, properties.headers or {})
+                print("[Ticket MS] verified:", event)
+                ch.basic_publish(exchange='', routing_key=globalVars.TICKET_GENERATED_NAME, body='Ticket generated!')
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            except InvalidSignature:
+                print("[Ticket MS] Signature check failed")
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
         self.channel.basic_consume(queue=globalVars.APPROVED_PAYMENT_TICKET_NAME, on_message_callback=on_approved_payment)
         
