@@ -54,7 +54,19 @@ class MSPayment:
             else:
                 payload = {"reserve_id": reservation.id, "status": "DENIED"}
                 out_body = json.dumps(payload).encode('utf-8')
-                ch.basic_publish(exchange='', routing_key=globalVars.DENIED_PAYMENT_NAME, body=out_body)
+
+                # Sign the payload with private key
+                sig = base64.b64encode(self._private_key.sign(out_body)).decode('utf-8')
+
+                ch.basic_publish(exchange='',
+                                 routing_key=globalVars.DENIED_PAYMENT_NAME,
+                                 body=out_body,
+                                 properties=pika.BasicProperties(
+                                    content_type="application/json",
+                                    headers={"sig_alg": "ed25519", "sig": sig},
+                                    delivery_mode=2          # make message persistent
+                                 )
+                                )
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
         self.channel.basic_consume(queue=globalVars.CREATED_RESERVE_NAME, on_message_callback=on_created_reserve)

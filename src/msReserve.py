@@ -26,7 +26,7 @@ import globalVars
 # --- logging -----------------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-logging.disable(logging.CRITICAL)
+# logging.disable(logging.CRITICAL)
 
 # --- modelo de dados ---------------------------------------------------------
 @dataclass
@@ -158,14 +158,18 @@ class MSReserve:
             LOGGER.error("[Reserve MS] Signature check failed")
             ch.basic_nack(method.delivery_tag, requeue=False)
 
-    def _on_denied_payment(self, ch, method, _props, body):
-        data = json.loads(body.decode())
-        with self._lock:
-            st = self._status.setdefault(data["reserve_id"], {})
-            st["reserve"]  = "FAILED"
-            st["payment"]  = "DENIED"
-        LOGGER.info("[Reserve MS] Received denial: %s", body.decode())
-        ch.basic_ack(method.delivery_tag)
+    def _on_denied_payment(self, ch, method, properties, body):
+        try:
+            data = verify_sig(body, properties.headers or {})
+            with self._lock:
+                st = self._status.setdefault(data["reserve_id"], {})
+                st["reserve"]  = "FAILED"
+                st["payment"]  = "DENIED"
+            LOGGER.info("[Reserve MS] Received denial: %s", body.decode())
+            ch.basic_ack(method.delivery_tag)
+        except InvalidSignature:
+            LOGGER.error("[Reserve MS] Signature check failed")
+            ch.basic_nack(method.delivery_tag, requeue=False)
 
     def _on_ticket_generated(self, ch, method, _props, body):
         try:
@@ -189,6 +193,7 @@ class MSReserve:
         if self.connection.is_open:
             self.connection.close()
         LOGGER.info("[Reserve MS] Connection closed.")
+        print("[Reserve MS] Connection closed.")
 
     def get_status(self, rid: int) -> dict | None:
         with self._lock:
