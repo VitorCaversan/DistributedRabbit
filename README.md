@@ -1,7 +1,7 @@
 # CruiseSync - Distributed Cruise Booking System
 
 **Authors:**  
-Alfons Andrade  
+Alfons Heiermann de Andrade  
 João Vitor Caversan dos Passos  
 
 **Course:** Distributed Systems  
