@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CruiseSync – Reservation Status</title>
+  <style>
+    :root {
+      --blue: #175EAD;
+      --light-blue: #C9E7FF;
+      --green: #2DB84C;
+      --red: #D9534F;
+      --gray: #B0BEC5;
+    }
+
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: var(--light-blue);
+      color: var(--blue);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    header {
+      width: 100%;
+      padding: 1rem 0;
+      background: linear-gradient(to bottom, var(--blue), #3E8ED0);
+      color: #fff;
+      text-align: center;
+    }
+
+    /* horizontal stepper */
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .circle {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      background: var(--gray);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      color: #fff;
+      transition: background 0.3s ease;
+    }
+
+    .circle.success {
+      background: var(--green);
+    }
+
+    .circle.failed {
+      background: var(--red);
+    }
+
+    .line {
+      flex: 1;
+      height: 0.25rem;
+      background: var(--gray);
+      transition: background 0.3s ease;
+    }
+
+    .line.success {
+      background: var(--green);
+    }
+
+    .label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--blue);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-top: 2rem;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CruiseSync · Reservation Progress</h1>
+  </header>
+
+  <main>
+    <div class="stepper" id="stepper">
+      <div class="step" id="step-reserve">
+        <div class="circle" data-step="reserve">1</div>
+        <span class="label">reserve</span>
+      </div>
+      <div class="line" id="line-1"></div>
+      <div class="step" id="step-payment">
+        <div class="circle" data-step="payment">2</div>
+        <span class="label">payment</span>
+      </div>
+      <div class="line" id="line-2"></div>
+      <div class="step" id="step-ticket">
+        <div class="circle" data-step="ticket">3</div>
+        <span class="label">ticket</span>
+      </div>
+    </div>
+
+    <div class="spinner" id="spinner" hidden></div>
+  </main>
+
+  <script>
+    /**
+     * Simple polling of backend for status.
+     * Backend endpoint sugerido:  GET /status/<reserve_id>
+     * Resposta JSON esperada: { reserve: "APPROVED|FAILED", payment: "APPROVED|DENIED|PENDING", ticket: "GENERATED|PENDING" }
+     */
+
+    const query = new URLSearchParams(window.location.search);
+    const reserveId = query.get("id");
+
+    const POLL_INTERVAL = 2000; // 2 s para simulação de "carregamento"
+
+    const circle = step => document.querySelector(`.circle[data-step="${step}"]`);
+    const line = n => document.getElementById(`line-${n}`);
+
+    function mark(step, state) {
+      const c = circle(step);
+      c.classList.remove("success", "failed");
+      if (state === "success") c.classList.add("success");
+      else if (state === "failed") c.classList.add("failed");
+    }
+
+    function markLine(num, state) {
+      const l = line(num);
+      l.classList.remove("success");
+      if (state === "success") l.classList.add("success");
+    }
+
+    async function poll() {
+      try {
+        if (!reserveId) throw new Error("missing id param");
+        const res = await fetch(`http://localhost:5000/status/${reserveId}`);
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+
+        // RESERVE ------------------
+        if (data.reserve === "APPROVED") {
+          mark("reserve", "success");
+          markLine(1, "success");
+        } else if (data.reserve === "FAILED") {
+          mark("reserve", "failed");
+          stopPolling();
+          return;
+        }
+
+        // PAYMENT ------------------
+        if (data.payment === "APPROVED") {
+          mark("payment", "success");
+          markLine(2, "success");
+        } else if (data.payment === "DENIED") {
+          mark("payment", "failed");
+          stopPolling();
+          return;
+        }
+
+        // TICKET -------------------
+        if (data.ticket === "GENERATED") {
+          mark("ticket", "success");
+          stopPolling();
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    let timer;
+    function startPolling() {
+      document.getElementById("spinner").hidden = false;
+      timer = setInterval(poll, POLL_INTERVAL);
+    }
+
+    function stopPolling() {
+      document.getElementById("spinner").hidden = true;
+      clearInterval(timer);
+    }
+
+    // ---- init ----
+    startPolling();
+  </script>
+</body>
+</html>
