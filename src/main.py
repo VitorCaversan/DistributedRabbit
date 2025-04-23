@@ -20,26 +20,39 @@ ms_ticket   = MSTicket()
 main_user   = None
 user_thread = None
 
+import os
+from flask import send_from_directory
+
+# diretórios absolutos
+BASE_DIR   = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+FRONT_DIR  = os.path.join(BASE_DIR, "frontend")
+DATA_DIR   = os.path.join(BASE_DIR, "databank")
+
+# ---------- páginas HTML / assets ----------
+@app.route("/")
+def index():
+    return send_from_directory(FRONT_DIR, "index.html")
+
+@app.route("/<path:filename>")
+def frontend_files(filename):
+    return send_from_directory(FRONT_DIR, filename)
+
+# ---------- arquivos JSON ----------
+@app.route("/databank/<path:filename>")
+def databank_files(filename):
+    return send_from_directory(DATA_DIR, filename)
+
+
 @app.route('/reserve', methods=['POST'])
 def reserve():
     try:
         data = request.get_json()
-        reservation = ReservationRequest(
-            id=data['id'],
-            ship=data['ship'],
-            departure_date=data['departure_date'],
-            embark_port=data['embark_port'],
-            return_port=data['return_port'],
-            visited_places=data['visited_places'],
-            nights=data['nights'],
-            price=data['price'],
-            passenger_count=data.get('passenger_count', 1),
-            cabins=data.get('cabins', 1)
-        )
-        ms_reserve.reserve_cruise(reservation)
+        reservation = ReservationRequest(**data)
+        ms_reserve.reserve_cruise(reservation)   # agenda publicação
         return jsonify({"status": "Reservation created and published!"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -58,6 +71,13 @@ def login():
         return jsonify({'status': 'error', 'error': 'User could not be created'}), 404
 
     return jsonify({'status': 'success'})
+
+@app.route("/status/<int:rid>")
+def status(rid):
+    st = ms_reserve.get_status(rid)
+    if st is None:
+        return jsonify({"error": "unknown reservation"}), 404
+    return jsonify(st)
 
 def main():
     """
