@@ -46,7 +46,7 @@
         "St. Thomas"
       ],
       "nights": 12,
-      "price": 1499
+      "price": 1300
     },
     {
       "id": 4,
@@ -79,7 +79,7 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 123
+      "price": 1000
     },
     {
       "id": 6,
