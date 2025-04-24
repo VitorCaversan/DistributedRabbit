@@ -1,10 +1,7 @@
 import json, threading, pika, globalVars
 
 class User(threading.Thread):
-    """
-    Se user_id == None ➜ ouve todas as promoções.
-    Guarda msgs recebidas em _buf; pop_promos() devolve e limpa.
-    """
+
     def __init__(self, host="localhost", user_id=None):
         super().__init__(daemon=True)
         self.user_id = user_id
@@ -15,8 +12,7 @@ class User(threading.Thread):
         self.conn = pika.BlockingConnection(pika.ConnectionParameters(host))
         self.ch   = self.conn.channel()
 
-        # ----- descobrir interesses -------------------------------
-        if user_id is None:         # ⟵ sem login → todos os cruzeiros
+        if user_id is None:
             with open("../databank/cruises.json") as f:
                 self.cruises_interests = [c["id"]
                                           for c in json.load(f)["itineraries"]]
@@ -28,7 +24,6 @@ class User(threading.Thread):
                 []
             )
 
-        # ----- declarar filas/binds -------------------------------
         qname = self.ch.queue_declare(queue="", exclusive=True).method.queue
         for cid in self.cruises_interests:
             ex = f"{globalVars.PROMOTION_EXCHANGE_NAME}{cid}"
@@ -41,14 +36,12 @@ class User(threading.Thread):
                               on_message_callback=self._on_promotion,
                               auto_ack=True)
 
-    # --------------------------------------------------------------
     def _on_promotion(self, _ch, _m, _p, body):
         with self._lock:
             self._buf.append(json.loads(body.decode()))
         print("[User] promo ->", body.decode())
 
     def pop_promos(self):
-        """Retorna lista e zera buffer (thread-safe)."""
         with self._lock:
             out, self._buf = self._buf, []
             return out

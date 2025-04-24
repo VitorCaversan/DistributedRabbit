@@ -1,8 +1,5 @@
-/* CruiseSync – Frontend logic */
-
 let cruiseData = [];
 
-/* ---------- carga inicial ---------- */
 async function loadItineraries() {
   try {
     const res  = await fetch("/databank/cruises.json");
@@ -16,10 +13,8 @@ async function loadItineraries() {
   }
 }
 
-/* ---------- helpers ---------- */
 const formatDate = d => d && d.split("-").reverse().join("/");
 
-/* ---------- render ---------- */
 function renderItineraries(list) {
   const c = document.querySelector(".itineraries");
   c.innerHTML = "<h2>Cruise Itineraries</h2>";
@@ -48,7 +43,6 @@ function renderItineraries(list) {
   });
 }
 
-/* ---------- busca ---------- */
 function handleSearch() {
   const dest  = document.getElementById("destination").value.toLowerCase().trim();
   const port  = document.getElementById("embarkPort").value.toLowerCase().trim();
@@ -65,7 +59,6 @@ function handleSearch() {
   renderItineraries(filtered);
 }
 
-/* ---------- reserva ---------- */
 function reserveCruise(cruise) {
   const reservation = {
     id : cruise.id, ship : cruise.ship,
@@ -90,30 +83,36 @@ function reserveCruise(cruise) {
   .catch(e => { console.error(e); alert("Error sending reservation."); });
 }
 
-/* ---------- login (opcional) ---------- */
-async function login() {
-  const u = document.getElementById("username").value;
-  const p = document.getElementById("password").value;
+async function login(){
+    const u=document.getElementById("username").value
+    const p=document.getElementById("password").value
+    const data=await (await fetch("/databank/users.json")).json()
+    const user=data.users.find(x=>x.username===u&&x.password===p)
+    if(!user){alert("Invalid credentials");return}
+    const d=await (await fetch("/login",{method:"POST",
+        headers:{ "Content-Type":"application/json"},
+        body:JSON.stringify({id:user.id})})).json()
+    if(d.status!=="success"){alert(`Login failed: ${d.error}`);return}
+    sessionStorage.setItem("loggedInUser",JSON.stringify(user))
+    renderLogged(user.username)
+    startPromoPolling()
+  }
+  
+  function logout(){
+    sessionStorage.removeItem("loggedInUser")
+    clearInterval(pollingId); pollingId=null
+    document.querySelector(".login-form").innerHTML=`
+      <input type="text" id="username" placeholder="Username">
+      <input type="password" id="password" placeholder="Password">
+      <button onclick="login()">Login</button>`
+  }
+  
+  function renderLogged(name){
+    document.querySelector(".login-form").innerHTML=
+      `<p>Logged in as <strong>${name}</strong></p>
+       <button onclick="logout()">Sign out</button>`
+  }
 
-  const res = await fetch("/databank/users.json"); const data = await res.json();
-  const user = data.users.find(x => x.username === u && x.password === p);
-  if (!user) { alert("Invalid credentials"); return; }
-
-  sessionStorage.setItem("loggedInUser", JSON.stringify(user));
-
-  fetch("/login", {
-    method:"POST", headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ id:user.id })
-  })
-  .then(r=>r.json())
-  .then(d=>{
-    if (d.status==="success") { alert(`Welcome, ${user.username}!`); location.reload(); }
-    else { alert(`Login failed: ${d.error}`); }
-  })
-  .catch(console.error);
-}
-
-/* ---------- promoções toast ---------- */
 function toast(msg){
   const t=document.createElement("div");
   t.className="toast";
@@ -122,24 +121,22 @@ function toast(msg){
   setTimeout(()=>t.remove(),5000);
 }
 
+let pollingId=null
 function startPromoPolling(){
-  setInterval(async ()=>{
+  if(pollingId) return
+  pollingId=setInterval(async()=>{
     try{
-      const r=await fetch("/promos");
-      if(!r.ok) return;
-      (await r.json()).forEach(p =>
-        toast(`🔥 Cruise ${p.cruise_id}: New Value! $${p.promotion_value}`));
-    }catch(e){console.error(e);}
-  },3000);
+      const r=await fetch("/promos")
+      if(!r.ok) return
+      ;(await r.json()).forEach(p=>
+        toast(`🔥 Cruise ${p.cruise_id}: new price $${p.promotion_value}`)
+      )
+    }catch(e){console.error(e)}
+  },3000)
 }
 
-/* ---------- init ---------- */
-window.addEventListener("DOMContentLoaded", ()=>{
-  loadItineraries();
-  startPromoPolling();
-  const user = JSON.parse(sessionStorage.getItem("loggedInUser")||"null");
-  if (user){
-    document.querySelector(".login-form").innerHTML =
-      `<p>Logged in as <strong>${user.username}</strong></p>`;
-  }
-});
+window.addEventListener("DOMContentLoaded",()=>{
+    loadItineraries()
+    const user=JSON.parse(sessionStorage.getItem("loggedInUser")||"null")
+    if(user){ renderLogged(user.username); startPromoPolling() }
+  })

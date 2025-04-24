@@ -8,37 +8,32 @@ from msPayment  import MSPayment
 from msTicket   import MSTicket
 from user       import User
 
-# ─── caminhos de pastas ──────────────────────────────────────────
 BASE_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 FRONT_DIR = os.path.join(BASE_DIR, "frontend")
 DATA_DIR  = os.path.join(BASE_DIR, "databank")
 
-# ─── Flask app (static_url_path="" = arquivos de FRONT_DIR na raiz) ──
 app = Flask(__name__, static_folder=FRONT_DIR, static_url_path="")
 CORS(app)
 
-# ─── micro-serviços ──────────────────────────────────────────────
 ms_reserve = MSReserve()
 ms_payment = MSPayment()
 ms_ticket  = MSTicket()
 
 main_user   = None
 user_thread = None
-promo_user  = User(user_id=None)        # escuta TODAS promoções (herda Thread)
+promo_user  = User(user_id=None)
 
-# ─── rotas frontend / assets ─────────────────────────────────────
-@app.route("/")                         # <-- devolve index.html
+@app.route("/") 
 def index():
     return send_from_directory(FRONT_DIR, "index.html")
 
-@app.route("/databank/<path:fname>")    # JSONs
+@app.route("/databank/<path:fname>")
 def databank(fname):
     return send_from_directory(DATA_DIR, fname)
 
-# ─── backend API ─────────────────────────────────────────────────
 @app.route("/promos")
 def promos():
-    return jsonify(promo_user.pop_promos())      # []
+    return jsonify(main_user.pop_promos() if main_user else [])
 
 @app.route("/reserve", methods=["POST"])
 def reserve():
@@ -46,30 +41,17 @@ def reserve():
     ms_reserve.reserve_cruise(reservation)
     return jsonify(status="Reservation created and published!")
 
-@app.route("/login", methods=["POST"])
-def login():
-    global main_user, user_thread
-    uid = request.get_json().get("id", 0)
-    if uid > 0 and main_user is None:
-        main_user   = User(user_id=uid)
-        user_thread = threading.Thread(target=main_user.run, daemon=True)
-        user_thread.start()
-    if main_user is None:
-        return jsonify(status="error", error="User could not be created"), 404
-    return jsonify(status="success")
-
 @app.route("/status/<int:rid>")
 def status(rid):
     st = ms_reserve.get_status(rid)
     return (jsonify(st) if st
             else (jsonify(error="unknown reservation"), 404))
 
-@app.route("/favicon.ico")              # evita 404 no log
+@app.route("/favicon.ico")
 def favicon():
     return "", 204
 
-# ─── servidor + threads ──────────────────────────────────────────
-PORT = 5050              # ✔ livre de conflitos com o AirPlay
+PORT = 5050
 
 def start():
     httpd = make_server("127.0.0.1", PORT, app)
@@ -108,6 +90,16 @@ def start():
         user_thread.join()
     sys.exit(0)
 
+@app.route("/login", methods=["POST"])
+def login():
+    global main_user, user_thread
+    uid = request.get_json().get("id", 0)
+    if uid and main_user is None:
+        main_user   = User(user_id=uid)
+        user_thread = threading.Thread(target=main_user.run, daemon=True)
+        user_thread.start()
+    return (jsonify(status="success") if main_user
+            else (jsonify(status="error", error="User could not be created"), 404))
 
 if __name__ == "__main__":
     print(f"⇢  http://127.0.0.1:{PORT}/  (Ctrl-C para sair)")
