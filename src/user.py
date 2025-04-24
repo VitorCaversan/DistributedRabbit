@@ -26,17 +26,21 @@ class User(threading.Thread):
                 []
             )
 
-        qname = self.ch.queue_declare(queue="", exclusive=True).method.queue
-        for cid in self.cruises_interests:
-            ex = f"{globalVars.PROMOTION_EXCHANGE_NAME}{cid}"
-            self.ch.exchange_declare(exchange=ex, exchange_type="direct",
-                                     durable=True)
-            self.ch.queue_bind(exchange=ex, queue=qname,
-                               routing_key=globalVars.PROMOTIONS_ROUTING_KEY)
+        exchange_name = globalVars.PROMOTION_EXCHANGE_NAME
+        self.ch.exchange_declare(exchange=exchange_name,
+                                 exchange_type='direct',
+                                 durable=True)
+        for cruise_id in self.cruises_interests:
+            queue_name = globalVars.PROMOTION_QUEUE_NAME + str(cruise_id)
+            routing_key = globalVars.PROMOTIONS_ROUTING_KEY + str(cruise_id)
+            self.ch.queue_declare(queue=queue_name, durable=True)
+            self.ch.queue_bind(exchange=exchange_name,
+                               queue=queue_name,
+                               routing_key=routing_key)
+            self.ch.basic_consume(queue=queue_name,
+                                  on_message_callback=self._on_promotion,
+                                  auto_ack=False)
 
-        self.ch.basic_consume(queue=qname,
-                              on_message_callback=self._on_promotion,
-                              auto_ack=False)
 
     def _on_promotion(self, _ch, _m, _p, body):
         with self._lock:
@@ -81,12 +85,13 @@ class User(threading.Thread):
         Subscribes to the promotions for a specific cruise ID and adds this id
         on the cruises_interests array on the users json.
         """
-        exchange_name = globalVars.PROMOTION_EXCHANGE_NAME + str(self.cruise_interest_to_add)
+        exchange_name = globalVars.PROMOTION_EXCHANGE_NAME
         queue_name = globalVars.PROMOTION_QUEUE_NAME + str(self.cruise_interest_to_add)
+        routing_key = globalVars.PROMOTIONS_ROUTING_KEY + str(self.cruise_interest_to_add)
         self.ch.queue_declare(queue=queue_name, durable=True)
         self.ch.queue_bind(exchange=exchange_name,
                                 queue=queue_name,
-                                routing_key=globalVars.PROMOTIONS_ROUTING_KEY)
+                                routing_key=routing_key)
         self.ch.basic_consume(queue=queue_name, on_message_callback=self.on_promotion)
 
         # Update user JSON

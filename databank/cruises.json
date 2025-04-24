@@ -14,7 +14,7 @@
         "Freeport"
       ],
       "nights": 7,
-      "price": 12
+      "price": 345
     },
     {
       "id": 2,
@@ -79,7 +79,7 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 1000
+      "price": 123
     },
     {
       "id": 6,
@@ -96,7 +96,7 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 567
+      "price": 1100
     }
   ]
 }

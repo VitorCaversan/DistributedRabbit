@@ -21,7 +21,6 @@ ms_ticket  = MSTicket()
 
 main_user   = None
 user_thread = None
-promo_user  = User(user_id=None)
 
 @app.route("/") 
 def index():
@@ -62,13 +61,12 @@ def start():
         threading.Thread(target=ms_reserve.run, daemon=True, name="MSReserve"),
         threading.Thread(target=ms_payment.run, daemon=True, name="MSPayment"),
         threading.Thread(target=ms_ticket.run,  daemon=True, name="MSTicket"),
-        promo_user
     ]
     for t in threads:
         t.start()
 
     def shutdown(*_):
-        ms_reserve.stop(); ms_payment.stop(); ms_ticket.stop(); promo_user.stop()
+        ms_reserve.stop(); ms_payment.stop(); ms_ticket.stop();
         if main_user: main_user.stop()
         try:
             socket.create_connection(("127.0.0.1", PORT), 1).close()
