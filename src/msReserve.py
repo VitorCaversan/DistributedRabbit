@@ -41,9 +41,7 @@ class ReservationRequest:
     price: float
     passenger_count: int = 1
     cabins: int = 1
-
-
-# --- micro-serviço -----------------------------------------------------------
+    
 class MSReserve:
     def __init__(self, host: str = "localhost"):
         self.host = host
@@ -55,27 +53,16 @@ class MSReserve:
         #               "ticket" : PENDING|GENERATED}}
         self._status = {}
 
-    # --------------------------------------------------------------------- API
     def reserve_cruise(self, reservation: ReservationRequest) -> str:
-        """
-        Chamado pela thread do Flask.
-        Em vez de publicar direto, agenda a _publish_reservation()
-        na thread do consumidor (seguro p/ thread).
-        """
         LOGGER.debug("Scheduling publish for reservation id=%s", reservation.id)
         self.connection.add_callback_threadsafe(
             partial(self._publish_reservation, reservation)
         )
-        return "Reservation scheduled to publish"
-    
+        return "Reservation scheduled to publish" 
 
     def run(self):
-        """
-        Thread que consome mensagens (deve ser iniciada via threading.Thread).
-        """
-        self._declare_topology()
 
-        # ---- callbacks de consumo ---------------------------------------
+        self._declare_topology()
         self.channel.basic_consume(
             queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME,
             on_message_callback=self._on_approved_payment,
@@ -99,10 +86,8 @@ class MSReserve:
             self._safe_close()
 
     def stop(self):
-        """Interrompe o start_consuming de forma thread-safe."""
         self.connection.add_callback_threadsafe(self.channel.stop_consuming)
 
-    # ----------------------------------------------------------------- internals
     def _setup_connection(self):
         self.connection = pika.BlockingConnection(
             pika.ConnectionParameters(self.host)
@@ -110,7 +95,6 @@ class MSReserve:
         self.channel = self.connection.channel()
 
     def _declare_topology(self):
-        # filas diretas
         for q in (
             globalVars.CREATED_RESERVE_NAME,
             globalVars.DENIED_PAYMENT_NAME,
@@ -133,9 +117,7 @@ class MSReserve:
             routing_key=globalVars.APPROVED_PAYMENT_ROUTING_KEY,
         )
 
-    # ---------- publicação agendada ------------------------------------------
     def _publish_reservation(self, reservation: ReservationRequest):
-        """Roda NA THREAD DO CONSUMER – pode usar self.channel com segurança."""
         msg = json.dumps(asdict(reservation))
         LOGGER.debug("Publishing reservation id=%s", reservation.id)
         self.channel.basic_publish(
@@ -144,7 +126,6 @@ class MSReserve:
             body=msg,
         )
 
-    # ---------- callbacks de consumo -----------------------------------------
     def _on_approved_payment(self, ch, method, properties, body):
         try:
             event = verify_sig(body, properties.headers or {})
@@ -173,10 +154,10 @@ class MSReserve:
 
     def _on_ticket_generated(self, ch, method, _props, body):
         try:
-            data = json.loads(body.decode())          # tenta decodificar
+            data = json.loads(body.decode())
             reserve_id = data.get("reserve_id")
         except json.JSONDecodeError:
-            reserve_id = None                         # mensagem inesperada
+            reserve_id = None
 
         if reserve_id is not None:
             with self._lock:
@@ -186,7 +167,6 @@ class MSReserve:
         LOGGER.info("[Reserve MS] Ticket generated msg: %s", body.decode())
         ch.basic_ack(method.delivery_tag)
 
-    # ---------- util ----------------------------------------------------------
     def _safe_close(self):
         if self.channel.is_open:
             self.channel.close()

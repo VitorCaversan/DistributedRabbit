@@ -14,7 +14,7 @@
         "Freeport"
       ],
       "nights": 7,
-      "price": 1200
+      "price": 345
     },
     {
       "id": 2,
@@ -30,7 +30,7 @@
         "Naples"
       ],
       "nights": 10,
-      "price": 1199
+      "price": 11
     },
     {
       "id": 3,
@@ -46,7 +46,7 @@
         "St. Thomas"
       ],
       "nights": 12,
-      "price": 1499
+      "price": 1300
     },
     {
       "id": 4,
@@ -79,7 +79,7 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 1234
+      "price": 123
     },
     {
       "id": 6,
@@ -96,7 +96,7 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 567
+      "price": 1100
     }
   ]
 }

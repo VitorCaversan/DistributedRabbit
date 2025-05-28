@@ -2,8 +2,7 @@ import os, json, base64, pathlib
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.exceptions import InvalidSignature
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent      # project root
-# Creating global variables for the folder path
+ROOT = pathlib.Path(__file__).resolve().parent.parent
 os.environ["MSPAYMENT_PRIV_KEY"] = str(ROOT / "keys" / "ms_payment_priv.pem")
 os.environ["MSPAYMENT_PUB_KEY"]  = str(ROOT / "keys" / "ms_payment_pub.pem")
 
@@ -15,5 +14,5 @@ def verify_sig(body: bytes, headers: dict) -> dict:
     if headers.get("sig_alg") != "ed25519" or "sig" not in headers:
         raise InvalidSignature("missing signature")
     sig = base64.b64decode(headers["sig"])
-    _PUBLIC.verify(sig, body)             # raises if bad
+    _PUBLIC.verify(sig, body)
     return json.loads(body.decode("utf-8"))

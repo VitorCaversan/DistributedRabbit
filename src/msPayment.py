@@ -1,18 +1,12 @@
-# ms_reserve.py
 from msReserve import ReservationRequest
 import globalVars
 import json
 import pika
 import os
 import base64
-# For signatures
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 class MSPayment:
-    """
-    MSPayment class to handle payment approval and denial after a reservation is done
-    in the created_reserve queue.
-    """
     def __init__(self, host='localhost'):
         self.host = host
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.host))
