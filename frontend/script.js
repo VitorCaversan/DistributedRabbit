@@ -34,6 +34,7 @@ function renderItineraries(list) {
             <p><strong>Visited Places:</strong> ${places}</p>
             <p><strong>Duration:</strong> ${cruise.nights} nights</p>
             <p><strong>Price per person:</strong> $${cruise.price}</p>
+            <p><strong>Available Cabins:</strong> ${cruise.available_seats}</p>
           </div>
           <div class="card-action">
             <button onclick='reserveCruise(${JSON.stringify(cruise)})'>Reserve</button>
@@ -67,7 +68,8 @@ function reserveCruise(cruise) {
     return_port : cruise.return_port,
     visited_places : cruise.visited_places,
     nights : cruise.nights, price : cruise.price,
-    passenger_count : 1, cabins : 1
+    passenger_count : 1,
+    cabins : cruise.available_cabins,
   };
 
   fetch("/reserve", {

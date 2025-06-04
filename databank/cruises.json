@@ -15,7 +15,8 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 123
+      "price": 123,
+      "available_cabins": 100
     },
     {
       "id": 6,
@@ -32,7 +33,8 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 1100
+      "price": 1100,
+      "available_cabins": 7
     }
   ]
 }
