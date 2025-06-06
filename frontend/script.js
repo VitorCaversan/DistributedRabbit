@@ -1,16 +1,19 @@
 let cruiseData = [];
 
 async function loadItineraries() {
-  try {
-    const res  = await fetch("/databank/cruises.json");
-    const data = await res.json();
-    cruiseData = data.itineraries;
-    renderItineraries(cruiseData);
-  } catch (err) {
-    console.error(err);
+  const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
+  const url = new URL(baseUrl);
+  url.searchParams.append("dest",    "all");
+
+  const response = await fetch(url);
+  if (!response.ok) {
     document.querySelector(".itineraries").innerHTML =
       "<h2>Cruise Itineraries</h2><p>Could not load itineraries.</p>";
+    throw new Error(`HTTP ${response.status}`);
   }
+  const data = await response.json();
+  console.log("Itineraries API response:", data);
+  renderItineraries(data);
 }
 
 const formatDate = d => d && d.split("-").reverse().join("/");
