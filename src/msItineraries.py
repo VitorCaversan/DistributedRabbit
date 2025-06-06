@@ -1,8 +1,37 @@
 # ms_reserve.py
 from verif_signature import verify_sig, InvalidSignature
-import globalVars
+import globalVars as gv
 import json
-import pika
+import pika, threading
+from flask import Flask, jsonify, request
+from wsgiref.simple_server import make_server
+
+app = Flask(__name__)
+
+@app.route("/itineraries", methods=["GET"])
+def get_itineraries():
+    with open('../databank/cruises.json', 'r') as file:
+            data = json.load(file)
+
+    dest = request.args.get("dest", type=str)
+    embark_port = request.args.get("embark_port", type=str) 
+    departure_date = request.args.get("departure_date", type=str) 
+
+    filtered = data.get('itineraries', [])
+
+    if dest.lower() == "all":
+        return jsonify(filtered), 200
+    
+    if dest:
+        filtered = [it for it in filtered if (dest in it.get("visited_places", []))]
+
+    if embark_port is not None:
+        filtered = [it for it in filtered if it.get("embark_port").lower() == embark_port.lower()]
+
+    if departure_date is not None:
+        filtered = [it for it in filtered if (departure_date in it.get("departure_dates", []))]
+
+    return jsonify(filtered), 200
 
 class MSItineraries:
     """
@@ -17,10 +46,15 @@ class MSItineraries:
         self.channel = self.connection.channel()
         
         for queue_name in [
-            globalVars.CREATED_RESERVE_Q_NAME,
-            globalVars.CANCELLED_RESERVE_Q_NAME,
+            gv.CREATED_RESERVE_Q_NAME,
+            gv.CANCELLED_RESERVE_Q_NAME,
         ]:
             self.channel.queue_declare(queue=queue_name)
+
+        httpd = make_server("localhost", gv.ITINERARIES_PORT, app)
+        print(f"msItineraries listening on :{gv.ITINERARIES_PORT}")
+        threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1),
+                         daemon=True, name="HTTP_itineraries").start(),
 
     def run(self):
         def on_created_reserve(ch, method, properties, body):
@@ -63,8 +97,8 @@ class MSItineraries:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
-        self.channel.basic_consume(queue=globalVars.CREATED_RESERVE_Q_NAME, on_message_callback=on_created_reserve, auto_ack=False)
-        self.channel.basic_consume(queue=globalVars.CANCELLED_RESERVE_Q_NAME, on_message_callback=on_cancelled_reserve, auto_ack=False)
+        self.channel.basic_consume(queue=gv.CREATED_RESERVE_Q_NAME, on_message_callback=on_created_reserve, auto_ack=False)
+        self.channel.basic_consume(queue=gv.CANCELLED_RESERVE_Q_NAME, on_message_callback=on_cancelled_reserve, auto_ack=False)
         
         try:
             print("[Itineraries MS] Listening on all queues")

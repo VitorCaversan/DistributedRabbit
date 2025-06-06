@@ -44,20 +44,26 @@ function renderItineraries(list) {
   });
 }
 
-function handleSearch() {
+async function handleSearch() {
   const dest  = document.getElementById("destination").value.toLowerCase().trim();
   const port  = document.getElementById("embarkPort").value.toLowerCase().trim();
   const date  = formatDate(document.getElementById("departureDate").value.trim());
 
   if (!dest || !port || !date) { alert("Please fill in all fields."); return; }
 
-  const filtered = cruiseData.filter(c =>
-    c.visited_places.some(p => p.toLowerCase().includes(dest)) &&
-    c.embark_port.toLowerCase().includes(port) &&
-    c.departure_dates.includes(date)
-  );
+  const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
+  const url = new URL(baseUrl);
+  url.searchParams.append("dest",    dest);
+  url.searchParams.append("embark_port",      port);
+  url.searchParams.append("departure_date",   date);
 
-  renderItineraries(filtered);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  const data = await response.json();
+  console.log("Itineraries API response:", data);
+  renderItineraries(data);
 }
 
 function reserveCruise(cruise) {
