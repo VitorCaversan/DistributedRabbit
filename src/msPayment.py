@@ -11,7 +11,6 @@ class MSPayment:
         self.host = host
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.host))
         self.channel = self.connection.channel()
-        self.channel.queue_declare(queue=globalVars.CREATED_RESERVE_NAME)
         self.channel.exchange_declare(exchange=globalVars.APPROVED_PAYMENT_EXCHANGE,
                                       exchange_type='direct',
                                       durable=True)
@@ -23,6 +22,7 @@ class MSPayment:
             self._private_key = load_pem_private_key(f.read(), password=None)
 
     def run(self):
+        # TODO: call this function when REST call is made to reserve a cruise
         def on_created_reserve(ch, method, properties, body):
             reservation = ReservationRequest(**json.loads(body.decode('utf-8')))
             print(f"[Payment MS] Received: {body.decode('utf-8')}")
@@ -63,8 +63,6 @@ class MSPayment:
                                 )
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
-        self.channel.basic_consume(queue=globalVars.CREATED_RESERVE_NAME, on_message_callback=on_created_reserve)
-        
         try:
             print("[Payment MS] Listening on all queues")
             self.channel.start_consuming()

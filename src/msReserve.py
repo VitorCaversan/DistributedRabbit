@@ -96,9 +96,10 @@ class MSReserve:
 
     def _declare_topology(self):
         for q in (
-            globalVars.CREATED_RESERVE_NAME,
             globalVars.DENIED_PAYMENT_NAME,
             globalVars.TICKET_GENERATED_NAME,
+            globalVars.CREATED_RESERVE_Q_NAME,
+            globalVars.CANCELLED_RESERVE_Q_NAME,
         ):
             self.channel.queue_declare(queue=q)
 
@@ -117,13 +118,24 @@ class MSReserve:
             routing_key=globalVars.APPROVED_PAYMENT_ROUTING_KEY,
         )
 
-    def _publish_reservation(self, reservation: ReservationRequest):
-        msg = json.dumps(asdict(reservation))
-        LOGGER.debug("Publishing reservation id=%s", reservation.id)
+    def publish_created_reserve(self, cruise_id):
+        payload = {"cruise_id": cruise_id}
+        out_body = json.dumps(payload).encode('utf-8')
+        LOGGER.debug("Publishing reservation id=%s", cruise_id)
         self.channel.basic_publish(
             exchange="",
-            routing_key=globalVars.CREATED_RESERVE_NAME,
-            body=msg,
+            routing_key=globalVars.CREATED_RESERVE_Q_NAME,
+            body=out_body,
+        )
+
+    def publish_cancelled_reserve(self, cruise_id):
+        payload = {"cruise_id": cruise_id}
+        out_body = json.dumps(payload).encode('utf-8')
+        LOGGER.debug("Publishing reservation id=%s", cruise_id)
+        self.channel.basic_publish(
+            exchange="",
+            routing_key=globalVars.CANCELLED_RESERVE_Q_NAME,
+            body=out_body,
         )
 
     def _on_approved_payment(self, ch, method, properties, body):

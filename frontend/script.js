@@ -1,16 +1,19 @@
 let cruiseData = [];
 
 async function loadItineraries() {
-  try {
-    const res  = await fetch("/databank/cruises.json");
-    const data = await res.json();
-    cruiseData = data.itineraries;
-    renderItineraries(cruiseData);
-  } catch (err) {
-    console.error(err);
+  const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
+  const url = new URL(baseUrl);
+  url.searchParams.append("dest",    "all");
+
+  const response = await fetch(url);
+  if (!response.ok) {
     document.querySelector(".itineraries").innerHTML =
       "<h2>Cruise Itineraries</h2><p>Could not load itineraries.</p>";
+    throw new Error(`HTTP ${response.status}`);
   }
+  const data = await response.json();
+  console.log("Itineraries API response:", data);
+  renderItineraries(data);
 }
 
 const formatDate = d => d && d.split("-").reverse().join("/");
@@ -34,6 +37,7 @@ function renderItineraries(list) {
             <p><strong>Visited Places:</strong> ${places}</p>
             <p><strong>Duration:</strong> ${cruise.nights} nights</p>
             <p><strong>Price per person:</strong> $${cruise.price}</p>
+            <p><strong>Available Cabins:</strong> ${cruise.available_seats}</p>
           </div>
           <div class="card-action">
             <button onclick='reserveCruise(${JSON.stringify(cruise)})'>Reserve</button>
@@ -43,20 +47,26 @@ function renderItineraries(list) {
   });
 }
 
-function handleSearch() {
+async function handleSearch() {
   const dest  = document.getElementById("destination").value.toLowerCase().trim();
   const port  = document.getElementById("embarkPort").value.toLowerCase().trim();
   const date  = formatDate(document.getElementById("departureDate").value.trim());
 
   if (!dest || !port || !date) { alert("Please fill in all fields."); return; }
 
-  const filtered = cruiseData.filter(c =>
-    c.visited_places.some(p => p.toLowerCase().includes(dest)) &&
-    c.embark_port.toLowerCase().includes(port) &&
-    c.departure_dates.includes(date)
-  );
+  const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
+  const url = new URL(baseUrl);
+  url.searchParams.append("dest",    dest);
+  url.searchParams.append("embark_port",      port);
+  url.searchParams.append("departure_date",   date);
 
-  renderItineraries(filtered);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  const data = await response.json();
+  console.log("Itineraries API response:", data);
+  renderItineraries(data);
 }
 
 function reserveCruise(cruise) {
@@ -67,7 +77,8 @@ function reserveCruise(cruise) {
     return_port : cruise.return_port,
     visited_places : cruise.visited_places,
     nights : cruise.nights, price : cruise.price,
-    passenger_count : 1, cabins : 1
+    passenger_count : 1,
+    cabins : cruise.available_cabins,
   };
 
   fetch("/reserve", {
