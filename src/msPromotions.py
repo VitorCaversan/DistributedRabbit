@@ -35,7 +35,7 @@ class MSPromotions:
     def publish_promotion(self, cruise_id, promotion_value):
         self._ensure()
         ex = f"{globalVars.PROMOTION_EXCHANGE_NAME}"
-        routing_key = f"{globalVars.PROMOTIONS_ROUTING_KEY}{cruise_id}"
+        routing_key = f"{globalVars.PROMOTIONS_ROUTING_KEY}"
         msg = json.dumps(
             {"cruise_id": cruise_id, "promotion_value": promotion_value}
         ).encode()

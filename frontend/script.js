@@ -95,34 +95,42 @@ function reserveCruise(cruise) {
 }
 
 async function login(){
-    const u=document.getElementById("username").value
-    const p=document.getElementById("password").value
-    const data=await (await fetch("/databank/users.json")).json()
-    const user=data.users.find(x=>x.username===u&&x.password===p)
-    if(!user){alert("Invalid credentials");return}
-    const d=await (await fetch("/login",{method:"POST",
-        headers:{ "Content-Type":"application/json"},
-        body:JSON.stringify({id:user.id})})).json()
-    if(d.status!=="success"){alert(`Login failed: ${d.error}`);return}
-    sessionStorage.setItem("loggedInUser",JSON.stringify(user))
-    renderLogged(user.username)
-    startPromoPolling()
-  }
-  
-  function logout(){
-    sessionStorage.removeItem("loggedInUser")
-    clearInterval(pollingId); pollingId=null
-    document.querySelector(".login-form").innerHTML=`
-      <input type="text" id="username" placeholder="Username">
-      <input type="password" id="password" placeholder="Password">
-      <button onclick="login()">Login</button>`
-  }
-  
-  function renderLogged(name){
-    document.querySelector(".login-form").innerHTML=
-      `<p>Logged in as <strong>${name}</strong></p>
-       <button onclick="logout()">Sign out</button>`
-  }
+  const u=document.getElementById("username").value
+  const p=document.getElementById("password").value
+  const data=await (await fetch("/databank/users.json")).json()
+  const user=data.users.find(x=>x.username===u&&x.password===p)
+  if(!user){alert("Invalid credentials");return}
+  const d=await (await fetch("http://127.0.0.1:5050/login",{method:"POST",
+      headers:{ "Content-Type":"application/json"},
+      body:JSON.stringify({id:user.id})})).json()
+  if(d.status!=="success"){alert(`Login failed: ${d.error}`);return}
+  sessionStorage.setItem("loggedInUser",JSON.stringify(user))
+  renderLogged(user.username, user.wants_promo)
+  startPromoPolling()
+}
+
+function logout(){
+  sessionStorage.removeItem("loggedInUser")
+  clearInterval(pollingId); pollingId=null
+  document.querySelector(".login-form").innerHTML=`
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>`
+
+  document.getElementById("promoToggleContainer").style.display = "none";
+
+  document.getElementById("promoToggle").checked = 0;
+}
+
+function renderLogged(name, wants_promo=false){
+  document.querySelector(".login-form").innerHTML=
+    `<p>Logged in as <strong>${name}</strong></p>
+      <button onclick="logout()">Sign out</button>`
+
+  document.getElementById("promoToggleContainer").style.display = "block";
+
+  document.getElementById("promoToggle").checked = !!wants_promo;
+}
 
 function toast(msg){
   const t=document.createElement("div");
@@ -137,7 +145,7 @@ function startPromoPolling(){
   if(pollingId) return
   pollingId=setInterval(async()=>{
     try{
-      const r=await fetch("/promos")
+      const r=await fetch("http://127.0.0.1:5050/promos")
       if(!r.ok) return
       ;(await r.json()).forEach(p=>
         toast(`🔥 Cruise ${p.cruise_id}: new price $${p.promotion_value}`)
@@ -151,3 +159,42 @@ window.addEventListener("DOMContentLoaded",()=>{
     const user=JSON.parse(sessionStorage.getItem("loggedInUser")||"null")
     if(user){ renderLogged(user.username); startPromoPolling() }
   })
+
+async function setUserPromotions(userId, wantsPromo) {
+  const url = `http://127.0.0.1:5050/users/${userId}/promotions`;
+
+  const resp = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ wants_promo: wantsPromo })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error("Failed to set promotions:", err);
+    alert("Could not update promotions");
+    return null;
+  }
+
+  const data = await resp.json();
+  console.log("Server response:", data);
+  return data.wants_promo;
+}
+
+document
+  .getElementById("promoToggle")
+  .addEventListener("change", async (e) => {
+    e.preventDefault();
+    const wantsPromo = e.target.checked;
+    const user = JSON.parse(sessionStorage.getItem("loggedInUser"));
+    const updated = await setUserPromotions(user.id, wantsPromo);
+    if (updated === null) {
+      e.target.checked = !wantsPromo;
+    } else {
+      user.wants_promo = updated;
+      sessionStorage.setItem("loggedInUser", JSON.stringify(user));
+    }
+  });
+
