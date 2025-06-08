@@ -82,7 +82,8 @@ def fetch_available_itineraries():
     return jsonify(itineraries), 200
 
 def start():
-    httpd = make_server("127.0.0.1", gv.MAIN_PORT, app)
+    httpd = make_server("0.0.0.0", gv.MAIN_PORT, app)
+
 
     threads = [
         threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1),
@@ -99,7 +100,7 @@ def start():
         ms_reserve.stop(); ms_payment.stop(); ms_ticket.stop(); ms_itineraries.stop()
         if main_user: main_user.stop()
         try:
-            socket.create_connection(("127.0.0.1", gv.MAIN_PORT), 1).close()
+            socket.create_connection(("0.0.0.0", gv.MAIN_PORT), 1).close()
         except:
             pass
         httpd.shutdown()
@@ -130,5 +131,5 @@ def login():
             else (jsonify(status="error", error="User could not be created"), 404))
 
 if __name__ == "__main__":
-    print(f"⇢  http://127.0.0.1:{gv.MAIN_PORT}/  (Ctrl-C para sair)")
+    print(f"⇢  http://0.0.0.0:{gv.MAIN_PORT}/  (Ctrl-C para sair)")
     start()
