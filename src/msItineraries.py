@@ -59,7 +59,7 @@ class MSItineraries:
     def run(self):
         def on_created_reserve(ch, method, properties, body):
             msg = json.loads(body.decode('utf-8'))
-            cruise_id = msg['cruise_id']
+            cruise_id = msg.get('cruise_id', msg.get('id'))
 
             with open('../databank/cruises.json', 'r') as file:
                 data = json.load(file)
@@ -77,9 +77,10 @@ class MSItineraries:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
+
         def on_cancelled_reserve(ch, method, properties, body):
             msg = json.loads(body.decode('utf-8'))
-            cruise_id = msg['cruise_id']
+            cruise_id = msg.get('cruise_id', msg.get('id'))
 
             with open('../databank/cruises.json', 'r') as file:
                 data = json.load(file)
@@ -103,7 +104,7 @@ class MSItineraries:
         try:
             print("[Itineraries MS] Listening on all queues")
             self.channel.start_consuming()
-        except pika.exceptions.ConnectionsClosed:
+        except pika.exceptions.ConnectionClosed:
             pass
         except pika.exceptions.ConnectionWrongStateError:
             pass
@@ -111,6 +112,7 @@ class MSItineraries:
             self.channel.close()
             self.connection.close()
             print("[Itineraries MS] Connection closed.")
+
     
     def stop(self):
         self.connection.add_callback_threadsafe(self.channel.stop_consuming)

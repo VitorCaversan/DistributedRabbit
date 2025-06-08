@@ -12,15 +12,14 @@ import json, logging
 from dataclasses import dataclass, asdict
 from functools import partial
 import threading
-
 import pika
 from pika.exceptions import (
     ConnectionClosed,
     StreamLostError,
     ChannelWrongStateError,
 )
-
 from verif_signature import verify_sig, InvalidSignature
+from msPromotions import MSPromotions
 import globalVars
 
 # --- logging -----------------------------------------------------------------
@@ -58,10 +57,31 @@ class MSReserve:
         self.connection.add_callback_threadsafe(
             partial(self._publish_reservation, reservation)
         )
-        return "Reservation scheduled to publish" 
+        return "Reservation scheduled to publish"
+
+    def _publish_reservation(self, reservation):
+        """
+        Publica a reserva na fila de reservas criadas.
+        """
+        payload = asdict(reservation)
+        out_body = json.dumps(payload).encode('utf-8')
+        self.channel.basic_publish(
+            exchange="",
+            routing_key=globalVars.CREATED_RESERVE_Q_NAME,
+            body=out_body,
+            properties=pika.BasicProperties(
+                content_type="application/json"
+            )
+        )
+        with self._lock:
+            self._status[reservation.id] = {
+                "reserve": "PENDING",
+                "payment": "PENDING",
+                "ticket": "PENDING"
+            }
+        LOGGER.info("Reserva publicada na fila: id=%s", reservation.id)
 
     def run(self):
-
         self._declare_topology()
         self.channel.basic_consume(
             queue=globalVars.APPROVED_PAYMENT_RESERVE_NAME,

@@ -57,5 +57,4 @@ class MSTicket:
             print("[Ticket MS] Connection closed.")
     
     def stop(self):
-        # thread‑safe way to break out of start_consuming
         self.connection.add_callback_threadsafe(self.channel.stop_consuming)
