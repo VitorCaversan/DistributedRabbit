@@ -13,36 +13,28 @@ class User(threading.Thread):
         self.ch   = self.conn.channel()
 
         self.cruise_interest_to_add = None # Used only to subscribe to promotion on a callback
+        self.consumer_tag = None
+        self.wants_promo = 0
 
         if user_id is None:
-            with open("../databank/cruises.json") as f:
-                self.cruises_interests = [c["id"]
-                                          for c in json.load(f)["itineraries"]]
+            self.wants_promo = 1
         else:
             with open("../databank/users.json") as f:
                 users = json.load(f)["users"]
-            self.cruises_interests = next(
-                (u["cruises_interests"] for u in users if u["id"] == user_id),
-                []
-            )
+            self.wants_promo = next(u["wants_promo"] for u in users if u["id"] == user_id)
 
         exchange_name = globalVars.PROMOTION_EXCHANGE_NAME
         self.ch.exchange_declare(exchange=exchange_name,
                                  exchange_type='direct',
                                  durable=True)
-        for cruise_id in self.cruises_interests:
-            queue_name = globalVars.PROMOTION_QUEUE_NAME + str(cruise_id)
-            routing_key = globalVars.PROMOTIONS_ROUTING_KEY + str(cruise_id)
-            self.ch.queue_declare(queue=queue_name, durable=True)
-            self.ch.queue_bind(exchange=exchange_name,
-                               queue=queue_name,
-                               routing_key=routing_key)
-            self.ch.basic_consume(queue=queue_name,
-                                  on_message_callback=self._on_promotion,
-                                  auto_ack=False)
-
+        self.setup_promo_consumer()
 
     def _on_promotion(self, _ch, _m, _p, body):
+        if self.wants_promo == 0:
+            print("[User MS] User does not want promotions, ignoring message")
+            _ch.basic_ack(delivery_tag=_m.delivery_tag)
+            return
+        
         with self._lock:
             self._buf.append(json.loads(body.decode()))
 
@@ -76,23 +68,22 @@ class User(threading.Thread):
             out, self._buf = self._buf, []
             return out
 
-    def run(self):
-        print("[User] Listening promotions…")
-        self.ch.start_consuming()
+    def setup_promo_consumer(self):
+        queue = globalVars.PROMOTION_QUEUE_NAME
+        key   = globalVars.PROMOTIONS_ROUTING_KEY
+        exch  = globalVars.PROMOTION_EXCHANGE_NAME
 
-    def do_subscribe(self):
-        """
-        Subscribes to the promotions for a specific cruise ID and adds this id
-        on the cruises_interests array on the users json.
-        """
-        exchange_name = globalVars.PROMOTION_EXCHANGE_NAME
-        queue_name = globalVars.PROMOTION_QUEUE_NAME + str(self.cruise_interest_to_add)
-        routing_key = globalVars.PROMOTIONS_ROUTING_KEY + str(self.cruise_interest_to_add)
-        self.ch.queue_declare(queue=queue_name, durable=True)
-        self.ch.queue_bind(exchange=exchange_name,
-                                queue=queue_name,
-                                routing_key=routing_key)
-        self.ch.basic_consume(queue=queue_name, on_message_callback=self.on_promotion)
+        self.ch.queue_declare(queue=queue, durable=True)
+        self.ch.queue_bind(exchange=exch, queue=queue, routing_key=key)
+
+        self.consumer_tag = self.ch.basic_consume(
+            queue=queue,
+            on_message_callback=self._on_promotion,
+            auto_ack=False
+        )
+
+    def disable_promotions(self):
+        self.wants_promo = 0
 
         # Update user JSON
         with open('../databank/users.json', 'r') as file:
@@ -102,8 +93,8 @@ class User(threading.Thread):
 
         for user in users:
             if user['id'] == self.user_id:
-                user['cruises_interests'].append(self.cruise_interest_to_add)
-                print(f"[User MS] User ID {self.user_id} subscribed to cruise ID {self.cruise_interest_to_add}")
+                user['wants_promo'] = 0
+                print(f"[User MS] User ID {self.user_id} unsubscribed to promotions")
                 break
         else:
             print(f"[User MS] User ID {self.user_id} not found in users.json")
@@ -111,13 +102,36 @@ class User(threading.Thread):
         with open('../databank/users.json', 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        self.cruise_interest_to_add = None
 
-    def subscribe_to_promotion(self, cruise_id):
-        self.cruise_interest_to_add = cruise_id
+    def enable_promotions(self):
+        self.wants_promo = 1
 
-        # Thread-safe way to subscribe to a new queue and bind it to the exchange
-        self.conn.add_callback_threadsafe(self.do_subscribe)
+        # Update user JSON
+        with open('../databank/users.json', 'r') as file:
+            data = json.load(file)
+            users = data.get('users', [])
+        users = users if isinstance(users, list) else []
+
+        for user in users:
+            if user['id'] == self.user_id:
+                user['wants_promo'] = 1
+                print(f"[User MS] User ID {self.user_id} subscribed to promotions")
+                break
+        else:
+            print(f"[User MS] User ID {self.user_id} not found in users.json")
+
+        with open('../databank/users.json', 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def set_wants_promo(self, flag: bool):
+        if flag and not self.wants_promo:
+            self.enable_promotions()
+        else:
+            self.disable_promotions()
+
+    def run(self):
+        print("[User] Running user ", self.user_id)
+        self.ch.start_consuming()
 
     def stop(self):
         self.conn.add_callback_threadsafe(self.ch.stop_consuming)

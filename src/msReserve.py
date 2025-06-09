@@ -23,7 +23,7 @@ from msPromotions import MSPromotions
 import globalVars
 
 # --- logging -----------------------------------------------------------------
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 LOGGER = logging.getLogger(__name__)
 # logging.disable(logging.CRITICAL)
 

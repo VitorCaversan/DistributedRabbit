@@ -91,6 +91,24 @@ def fetch_available_itineraries():
 
     return jsonify(itineraries), 200
 
+@app.route("/users/<int:user_id>/promotions", methods=["PUT"])
+def toggle_promotions(user_id):
+    # Expects JSON: { "wants_promo": true } or { "wants_promo": false }
+    body = request.get_json(force=True)
+    if "wants_promo" not in body:
+        return jsonify({"error": "missing wants_promo"}), 400
+
+    wants = bool(body["wants_promo"])
+
+    if main_user is None or main_user.user_id != user_id:
+        return jsonify({"error": "user not logged in"}), 403
+    main_user.set_wants_promo(wants)
+
+    return jsonify({
+        "user_id":      user_id,
+        "wants_promo":  main_user.wants_promo
+    }), 200
+
 def start():
     httpd = make_server("0.0.0.0", gv.MAIN_PORT, app)
     threads = [
