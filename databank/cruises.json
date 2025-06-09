@@ -16,7 +16,8 @@
       ],
       "nights": 12,
       "price": 345,
-      "available_cabins": 100
+      "available_cabins": 100,
+      "passenger_count": 300
     },
     {
       "id": 2,
@@ -34,7 +35,8 @@
       ],
       "nights": 12,
       "price": 456,
-      "available_cabins": 7
+      "available_cabins": 7,
+      "passenger_count": 30
     }
   ]
 }

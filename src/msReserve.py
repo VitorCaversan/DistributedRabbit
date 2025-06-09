@@ -40,6 +40,7 @@ class ReservationRequest:
     price: float
     passenger_count: int = 1
     cabins: int = 1
+    user_id: int = 0
     
 class MSReserve:
     def __init__(self, host: str = "localhost"):
@@ -148,8 +149,8 @@ class MSReserve:
             body=out_body,
         )
 
-    def publish_cancelled_reserve(self, cruise_id):
-        payload = {"cruise_id": cruise_id}
+    def publish_cancelled_reserve(self, cruise_id, user_id):
+        payload = {"cruise_id": cruise_id, "user_id": user_id,}
         out_body = json.dumps(payload).encode('utf-8')
         LOGGER.debug("Publishing reservation id=%s", cruise_id)
         self.channel.basic_publish(
@@ -174,6 +175,7 @@ class MSReserve:
     def _on_denied_payment(self, ch, method, properties, body):
         try:
             data = verify_sig(body, properties.headers or {})
+            self.publish_cancelled_reserve(cruise_id=data["reserve_id"], user_id=data["user_id"])
             with self._lock:
                 st = self._status.setdefault(data["reserve_id"], {})
                 st["reserve"]  = "FAILED"

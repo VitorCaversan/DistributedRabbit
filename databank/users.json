@@ -4,13 +4,15 @@
       "id": 1,
       "username": "alf",
       "password": "1234",
-      "wants_promo": 0
+      "wants_promo": 0,
+      "reservations": []
     },
     {
       "id": 2,
       "username": "joao",
       "password": "4321",
-      "wants_promo": 1
+      "wants_promo": 1,
+      "reservations": []
     }
   ]
 }

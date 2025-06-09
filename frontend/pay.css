@@ -1,0 +1,21 @@
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #F2F8FF;
+    color: #2A4A77;
+    text-align: center;
+}
+
+button {
+    background: #2DB84C;
+    color: #fff;
+    padding: 1em 2em;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.2em;
+    margin: 1em;
+    cursor: pointer;
+}
+
+button.deny {
+    background: #d22;
+}

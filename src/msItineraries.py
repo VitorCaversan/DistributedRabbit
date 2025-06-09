@@ -5,6 +5,7 @@ import json
 import pika, threading
 from flask import Flask, jsonify, request
 from wsgiref.simple_server import make_server
+from msReserve import ReservationRequest
 
 app = Flask(__name__)
 
@@ -59,21 +60,42 @@ class MSItineraries:
     def run(self):
         def on_created_reserve(ch, method, properties, body):
             msg = json.loads(body.decode('utf-8'))
-            cruise_id = msg.get('cruise_id', msg.get('id'))
+            reservation = ReservationRequest(**msg)
+
+            with open('../databank/users.json', 'r') as file:
+                users_data = json.load(file)
+
+            users = users_data.get("users", [])
+            for user in users:
+                if user.get("id") == reservation.user_id:
+                    user.setdefault("reservations", [])
+                    
+                    new_entry = {
+                        "cruise_id":       reservation.id,
+                        "passenger_count": reservation.passenger_count,
+                        "cabins":          reservation.cabins
+                    }
+                    user["reservations"].append(new_entry)
+                    break
+
+            with open('../databank/users.json', 'w', encoding='utf-8') as f:
+                print(f"[Itineraries MS] Updated file user {reservation.user_id} with reservation {reservation.id}")
+                json.dump(users_data, f, indent=2, ensure_ascii=False)
 
             with open('../databank/cruises.json', 'r') as file:
                 data = json.load(file)
 
             for itin in data.get('itineraries', []):
-                if itin.get('id') == cruise_id:
-                    itin['available_cabins'] = itin['available_cabins'] - 1
-                    print(f"[Itineraries MS] Updated cruise {cruise_id} available cabins to {itin['available_cabins']}")
+                if itin.get('id') == reservation.id:
+                    itin['available_cabins'] = itin['available_cabins'] - reservation.cabins
+                    itin['passenger_count'] = itin.get('passenger_count', 0) - reservation.passenger_count
+                    print(f"[Itineraries MS] Updated cruise {reservation.id} available cabins to {itin['available_cabins']}")
                     break
             else:
-                print(f"[Itineraries MS] No itinerary found with id {cruise_id}")
+                print(f"[Itineraries MS] No itinerary found with id {reservation.id}")
 
             with open('../databank/cruises.json', 'w', encoding='utf-8') as f:
-                print(f"[Itineraries MS] Updated file cruise {cruise_id} available cabins")
+                print(f"[Itineraries MS] Updated file cruise {reservation.id} available cabins")
                 json.dump(data, f, indent=2, ensure_ascii=False)
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -81,13 +103,34 @@ class MSItineraries:
         def on_cancelled_reserve(ch, method, properties, body):
             msg = json.loads(body.decode('utf-8'))
             cruise_id = msg.get('cruise_id', msg.get('id'))
+            user_id = msg.get('user_id', None)
+
+            users_path = "../databank/users.json"
+            with open(users_path, 'r', encoding='utf-8') as f:
+                users_data = json.load(f)
+
+            for user in users_data.get("users", []):
+                if user.get("id") == user_id:
+                    existing = user.get("reservations", [])
+                    reservation_to_remove = next((r for r in existing if r.get("cruise_id") == cruise_id), None)
+                    user["reservations"] = [
+                        r for r in existing
+                        if r.get("cruise_id") != cruise_id
+                    ]
+                    break
+            else:
+                raise ValueError(f"User {user_id} not found")
+
+            with open(users_path, 'w', encoding='utf-8') as f:
+                json.dump(users_data, f, ensure_ascii=False, indent=2)
 
             with open('../databank/cruises.json', 'r') as file:
                 data = json.load(file)
 
             for itin in data.get('itineraries', []):
                 if itin.get('id') == cruise_id:
-                    itin['available_cabins'] = itin['available_cabins'] + 1
+                    itin['available_cabins'] = itin['available_cabins'] + reservation_to_remove['cabins']
+                    itin['passenger_count'] = itin.get('passenger_count', 0) + reservation_to_remove['passenger_count']
                     print(f"[Itineraries MS] Updated cruise {cruise_id} available cabins to {itin['available_cabins']}")
                     break
             else:

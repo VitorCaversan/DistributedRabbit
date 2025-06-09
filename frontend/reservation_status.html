@@ -1,175 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CruiseSync – Reservation Status</title>
-  <style>
-    :root {
-      --blue: #175EAD;
-      --light-blue: #C9E7FF;
-      --green: #2DB84C;
-      --red: #D9534F;
-      --gray: #B0BEC5;
-    }
-
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background: var(--light-blue);
-      color: var(--blue);
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2rem;
-    }
-
-    header {
-      width: 100%;
-      padding: 1rem 0;
-      background: linear-gradient(to bottom, var(--blue), #3E8ED0);
-      color: #fff;
-      text-align: center;
-    }
-
-    /* horizontal stepper */
-    .stepper {
-      display: flex;
-      align-items: center;
-      gap: 2rem;
-      margin-top: 3rem;
-    }
-
-    .step {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .circle {
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: 50%;
-      background: var(--gray);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      color: #fff;
-      transition: background 0.3s ease;
-    }
-
-    .circle.success {
-      background: var(--green);
-    }
-
-    .circle.failed {
-      background: var(--red);
-    }
-
-    .line {
-      flex: 1;
-      height: 0.25rem;
-      background: var(--gray);
-      transition: background 0.3s ease;
-    }
-
-    .line.success {
-      background: var(--green);
-    }
-
-    .label {
-      font-size: 0.9rem;
-      font-weight: 600;
-      text-transform: capitalize;
-    }
-
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid var(--blue);
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin-top: 2rem;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CruiseSync – Reservation Status</title>
+    <link rel="stylesheet" href="reservation_status.css" />
 </head>
 <body>
-  <header>
-    <h1>CruiseSync · Reservation Progress</h1>
-  </header>
+    <header>
+        <h1>CruiseSync · Reservation Progress</h1>
+    </header>
 
-  <main>
-    <div class="stepper" id="stepper">
-      <div class="step" id="step-reserve">
-        <div class="circle" data-step="reserve">1</div>
-        <span class="label">reserve</span>
-      </div>
-      <div class="line" id="line-1"></div>
-      <div class="step" id="step-payment">
-        <div class="circle" data-step="payment">2</div>
-        <span class="label">payment</span>
-      </div>
-      <div class="line" id="line-2"></div>
-      <div class="step" id="step-ticket">
-        <div class="circle" data-step="ticket">3</div>
-        <span class="label">ticket</span>
-      </div>
-    </div>
+    <main>
+        <div class="stepper" id="stepper">
+            <div class="step" id="step-reserve">
+                <div class="circle" data-step="reserve">1</div>
+                <span class="label">reserve</span>
+            </div>
+            <div class="line" id="line-1"></div>
+            <div class="step" id="step-payment">
+                <div class="circle" data-step="payment">2</div>
+                <span class="label">payment</span>
+            </div>
+            <div class="line" id="line-2"></div>
+            <div class="step" id="step-ticket">
+                <div class="circle" data-step="ticket">3</div>
+                <span class="label">ticket</span>
+            </div>
+        </div>
 
-    <div class="spinner" id="spinner" hidden></div>
-  </main>
+        <div class="spinner" id="spinner" hidden></div>
 
-  <script>
-    const reserveId = new URLSearchParams(location.search).get("id");
-    const POLL_INTERVAL = 2000;
-    
-    const circle = step => document.querySelector(`.circle[data-step="${step}"]`);
-    const line   = n    => document.getElementById(`line-${n}`);
-    
-    function mark(step,state){
-      const c = circle(step);
-      c.classList.remove("success","failed");
-      if(state==="success") c.classList.add("success");
-      if(state==="failed")  c.classList.add("failed");
-    }
-    function markLine(n,state){
-      const l=line(n); l.classList.toggle("success",state==="success");
-    }
-    
-    async function poll(){
-      try{
-        if(!reserveId) return;
-        const r = await fetch(`/status/${reserveId}`);
-        if(!r.ok) throw new Error(await r.text());
-        const d = await r.json();
-    
-        if(d.reserve==="APPROVED"){ mark("reserve","success"); markLine(1,"success"); }
-        if(d.reserve==="FAILED")  { mark("reserve","failed");  stop(); return; }
-    
-        if(d.payment==="APPROVED"){ mark("payment","success"); markLine(2,"success"); }
-        if(d.payment==="DENIED")  { mark("payment","failed");  stop(); return; }
-    
-        if(d.ticket==="GENERATED"){ mark("ticket","success");  stop(); return; }
-      }catch(e){console.error(e);}
-    }
-    
-    let timer;
-    function start(){ document.getElementById("spinner").hidden=false;
-                      timer=setInterval(poll,POLL_INTERVAL);}
-    function stop (){ document.getElementById("spinner").hidden=true;
-                      clearInterval(timer);}
-    
-    start();
-    </script>
-    
+        <button class="home-btn" onclick="window.location.href='index.html'">
+            ← Back to Homepage
+        </button>
+    </main>
+
+    <script src="reservation_status.js"></script>
 </body>
 </html>

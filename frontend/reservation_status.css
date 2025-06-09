@@ -1,0 +1,112 @@
+:root {
+    --blue: #175EAD;
+    --light-blue: #C9E7FF;
+    --green: #2DB84C;
+    --red: #D9534F;
+    --gray: #B0BEC5;
+}
+
+body {
+    font-family: "Segoe UI", sans-serif;
+    background: var(--light-blue);
+    color: var(--blue);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+}
+
+header {
+    width: 100%;
+    padding: 1rem 0;
+    background: linear-gradient(to bottom, var(--blue), #3E8ED0);
+    color: #fff;
+    text-align: center;
+}
+
+.stepper {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.circle {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: #fff;
+    transition: background 0.3s ease;
+}
+
+.circle.success {
+    background: var(--green);
+}
+
+.circle.failed {
+    background: var(--red);
+}
+
+.line {
+    flex: 1;
+    height: 0.25rem;
+    background: var(--gray);
+    transition: background 0.3s ease;
+}
+
+.line.success {
+    background: var(--green);
+}
+
+.label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--blue);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-top: 2rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.home-btn {
+    margin: 2.5rem auto 0 auto;
+    display: block;
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 2rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: 600;
+    box-shadow: 0 2px 10px #0001;
+}
+.home-btn:hover {
+    background: #3E8ED0;
+}

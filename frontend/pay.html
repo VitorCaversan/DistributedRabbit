@@ -1,42 +1,17 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <title>Pagar Reserva</title>
-  <style>
-    body { font-family: 'Segoe UI', sans-serif; background: #F2F8FF; color: #2A4A77; text-align: center; }
-    button { background: #2DB84C; color: #fff; padding: 1em 2em; border: none; border-radius: 8px; font-size: 1.2em; margin: 1em; cursor: pointer;}
-    button.deny { background: #d22; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Pagar Reserva</title>
+    <link rel="stylesheet" href="pay.css">
 </head>
 <body>
-  <h1>Pagamento de Reserva</h1>
-  <p>Confirme o pagamento da reserva #<span id="rid"></span></p>
-  <form id="payForm">
-    <button type="submit">Confirmar Pagamento</button>
-    <button type="button" class="deny" id="denyBtn">Recusar Pagamento</button>
-  </form>
-  <script>
-    const params = new URLSearchParams(location.search);
-    const rid = location.pathname.split("/").pop();
-    document.getElementById("rid").textContent = rid;
-
-    document.getElementById("payForm").addEventListener("submit", e => {
-      e.preventDefault();
-      fetch(`/pay/${rid}/confirm`, { method: "POST" })
-        .then(() => {
-            alert("Pagamento confirmado!");
-            window.location.href = "http://localhost:5050/reservation_status.html?id=" + rid;
-        });
-    });
-    document.getElementById("denyBtn").addEventListener("click", e => {
-      e.preventDefault();
-      fetch(`/pay/${rid}/deny`, { method: "POST" })
-        .then(() => {
-            alert("Pagamento recusado!");
-            window.location.href = "http://localhost:5050/reservation_status.html?id=" + rid;
-        });
-    });
-  </script>
+    <h1>Pagamento de Reserva</h1>
+    <p>Confirme o pagamento da reserva #<span id="rid"></span></p>
+    <form id="payForm">
+        <button type="submit">Confirmar Pagamento</button>
+        <button type="button" class="deny" id="denyBtn">Recusar Pagamento</button>
+    </form>
+    <script src="pay.js"></script>
 </body>
 </html>

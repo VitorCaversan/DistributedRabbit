@@ -34,10 +34,11 @@ class MSPayment:
         def payment_webhook():
             data = request.get_json()
             reserve_id = data.get("reserve_id")
+            user_id = data.get("user_id")
             status = data.get("status", "APPROVED")
             print(f"[Payment MS] Webhook recebido: {data}")
 
-            payload = {"reserve_id": reserve_id, "status": status}
+            payload = {"reserve_id": reserve_id, "user_id": user_id, "status": status}
             out_body = json.dumps(payload).encode('utf-8')
             sig = base64.b64encode(self._private_key.sign(out_body)).decode('utf-8')
 
@@ -69,22 +70,22 @@ class MSPayment:
             return jsonify({"status": "ok"})
 
         # NOVAS ROTAS PARA INTERFACE EXTERNA DE PAGAMENTO
-        @self.app.route("/pay/<int:rid>/confirm", methods=["POST"])
-        def pay_confirm(rid):
+        @self.app.route("/pay/<int:rid>/<int:user_id>/confirm", methods=["POST"])
+        def pay_confirm(rid, user_id):
             # Simula confirmação, chama o próprio webhook interno
             url = f"http://localhost:{gv.PAYMENT_INTERNAL_PORT}/payment_webhook"
-            data = {"reserve_id": rid, "status": "APPROVED"}
+            data = {"reserve_id": rid, "user_id": user_id, "status": "APPROVED"}
             try:
                 requests.post(url, json=data)
             except Exception as e:
                 print(f"[Payment MS] Erro ao chamar webhook: {e}")
             return '', 204
 
-        @self.app.route("/pay/<int:rid>/deny", methods=["POST"])
-        def pay_deny(rid):
+        @self.app.route("/pay/<int:rid>/<int:user_id>/deny", methods=["POST"])
+        def pay_deny(rid, user_id):
             # Simula recusa, chama o próprio webhook interno
             url = f"http://localhost:{gv.PAYMENT_INTERNAL_PORT}/payment_webhook"
-            data = {"reserve_id": rid, "status": "DENIED"}
+            data = {"reserve_id": rid, "user_id": user_id, "status": "DENIED"}
             try:
                 requests.post(url, json=data)
             except Exception as e:
