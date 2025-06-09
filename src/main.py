@@ -1,8 +1,7 @@
-import os, sys, time, socket, signal, threading, json
+import os, sys, time, socket, signal, threading
 from wsgiref.simple_server import make_server
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-import os
 import requests
 import globalVars as gv
 
@@ -11,6 +10,7 @@ from msPayment     import MSPayment
 from msTicket      import MSTicket
 from msItineraries import MSItineraries
 from user          import User
+from dataclasses import asdict
 
 BASE_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 FRONT_DIR = os.path.join(BASE_DIR, "frontend")
@@ -43,9 +43,19 @@ def promos(user_id):
 
 @app.route("/reserve", methods=["POST"])
 def reserve():
-    reservation = ReservationRequest(**request.get_json())
+    data = request.get_json()
+    reservation = ReservationRequest(**data)
     ms_reserve.reserve_cruise(reservation)
-    return jsonify(status="Reservation created and published!")
+    # Chama o serviço de pagamento mock (exemplo)
+    resp = requests.post(f"http://localhost:{gv.PAYMENT_PORT}/generate_payment", json=asdict(reservation))
+    if resp.status_code == 200:
+        pay_data = resp.json()
+        return jsonify({
+            "status": "Reservation created and published!",
+            "payment_url": pay_data["payment_url"]
+        })
+    else:
+        return jsonify({"status": "error", "details": "Could not create payment link"}), 502
 
 @app.route("/status/<int:rid>")
 def status(rid):
@@ -101,10 +111,8 @@ def toggle_promotions(user_id):
 
 def start():
     httpd = make_server("0.0.0.0", gv.MAIN_PORT, app)
-
     threads = [
-        threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1),
-                         daemon=True, name="HTTP"),
+        threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1), daemon=True, name="HTTP"),
         threading.Thread(target=ms_reserve.run, daemon=True, name="MSReserve"),
         threading.Thread(target=ms_payment.run, daemon=True, name="MSPayment"),
         threading.Thread(target=ms_ticket.run,  daemon=True, name="MSTicket"),

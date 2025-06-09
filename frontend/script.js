@@ -3,7 +3,7 @@ let cruiseData = [];
 async function loadItineraries() {
   const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
   const url = new URL(baseUrl);
-  url.searchParams.append("dest",    "all");
+  url.searchParams.append("dest", "all");
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -25,7 +25,7 @@ function renderItineraries(list) {
 
   list.forEach(cruise => {
     const places = cruise.visited_places.join(" • ");
-    const dates  = cruise.departure_dates.join(", ");
+    const dates = cruise.departure_dates.join(", ");
     c.insertAdjacentHTML("beforeend", `
       <div class="card">
         <div class="card-content">
@@ -37,7 +37,7 @@ function renderItineraries(list) {
             <p><strong>Visited Places:</strong> ${places}</p>
             <p><strong>Duration:</strong> ${cruise.nights} nights</p>
             <p><strong>Price per person:</strong> $${cruise.price}</p>
-            <p><strong>Available Cabins:</strong> ${cruise.available_seats}</p>
+            <p><strong>Available Cabins:</strong> ${cruise.available_seats || cruise.available_cabins || cruise.cabins || 0}</p>
           </div>
           <div class="card-action">
             <button onclick='reserveCruise(${JSON.stringify(cruise)})'>Reserve</button>
@@ -48,17 +48,17 @@ function renderItineraries(list) {
 }
 
 async function handleSearch() {
-  const dest  = document.getElementById("destination").value.toLowerCase().trim();
-  const port  = document.getElementById("embarkPort").value.toLowerCase().trim();
-  const date  = formatDate(document.getElementById("departureDate").value.trim());
+  const dest = document.getElementById("destination").value.toLowerCase().trim();
+  const port = document.getElementById("embarkPort").value.toLowerCase().trim();
+  const date = formatDate(document.getElementById("departureDate").value.trim());
 
   if (!dest || !port || !date) { alert("Please fill in all fields."); return; }
 
   const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
   const url = new URL(baseUrl);
-  url.searchParams.append("dest",    dest);
-  url.searchParams.append("embark_port",      port);
-  url.searchParams.append("departure_date",   date);
+  url.searchParams.append("dest", dest);
+  url.searchParams.append("embark_port", port);
+  url.searchParams.append("departure_date", date);
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -70,28 +70,55 @@ async function handleSearch() {
 }
 
 function reserveCruise(cruise) {
+  // Para compatibilidade, garantir nome do campo correto de cabines disponíveis
+  const availableCabins = cruise.available_cabins || cruise.available_seats || cruise.cabins || 1;
+
   const reservation = {
-    id : cruise.id, ship : cruise.ship,
-    departure_date : cruise.departure_dates[0],
-    embark_port : cruise.embark_port,
-    return_port : cruise.return_port,
-    visited_places : cruise.visited_places,
-    nights : cruise.nights, price : cruise.price,
-    passenger_count : 1,
-    cabins : cruise.available_cabins,
+    id: cruise.id,
+    ship: cruise.ship,
+    departure_date: cruise.departure_dates ? cruise.departure_dates[0] : cruise.departure_date,
+    embark_port: cruise.embark_port,
+    return_port: cruise.return_port,
+    visited_places: cruise.visited_places,
+    nights: cruise.nights,
+    price: cruise.price,
+    passenger_count: 1,
+    cabins: availableCabins,
   };
 
   fetch("/reserve", {
-    method : "POST",
-    headers : { "Content-Type":"application/json" },
-    body : JSON.stringify(reservation)
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reservation)
   })
-  .then(r => r.json())
-  .then(d => {
-    if (!d.status) { alert(`Reservation error: ${d.error}`); return; }
-    window.location.href = `reservation_status.html?id=${reservation.id}`;
-  })
-  .catch(e => { console.error(e); alert("Error sending reservation."); });
+    .then(r => r.json())
+    .then(d => {
+      if (!d.status || d.status === "error") {
+        alert(`Reservation error: ${d.error || d.details}`);
+        toast(`❌ Reservation error: ${d.error || d.details}`);
+        return;
+      }
+      // Se vier o link de pagamento, salva e oferece redirecionar
+      if (d.payment_url) {
+        sessionStorage.setItem("lastPaymentUrl", d.payment_url);
+        toast("Reserva criada! Redirecionando para pagamento...");
+        setTimeout(() => {
+          if (confirm("Reserva criada! Deseja ir para o pagamento agora?")) {
+            window.location.href = d.payment_url;
+          } else {
+            window.location.href = `http://localhost:5050/reservation_status.html?id=${rid}`;
+          }
+        }, 900);
+      } else {
+        toast("Reserva criada! Aguardando aprovação...");
+        window.location.href = `http://localhost:5050/reservation_status.html?id=${rid}`;
+      }
+    })
+    .catch(e => {
+      console.error(e);
+      alert("Error sending reservation.");
+      toast("❌ Error sending reservation.");
+    });
 }
 
 async function login(){
@@ -132,12 +159,50 @@ function renderLogged(name, wants_promo=false){
   document.getElementById("promoToggle").checked = !!wants_promo;
 }
 
-function toast(msg){
-  const t=document.createElement("div");
-  t.className="toast";
-  t.textContent=msg;
+function logout(){
+  sessionStorage.removeItem("loggedInUser")
+  clearInterval(pollingId); pollingId=null
+  document.querySelector(".login-form").innerHTML=`
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>`
+
+  document.getElementById("promoToggleContainer").style.display = "none";
+
+  document.getElementById("promoToggle").checked = 0;
+}
+
+function renderLogged(name, wants_promo=false){
+  document.querySelector(".login-form").innerHTML=
+    `<p>Logged in as <strong>${name}</strong></p>
+      <button onclick="logout()">Sign out</button>`
+
+  document.getElementById("promoToggleContainer").style.display = "block";
+
+  document.getElementById("promoToggle").checked = !!wants_promo;
+}
+
+function logout() {
+  sessionStorage.removeItem("loggedInUser")
+  clearInterval(pollingId); pollingId = null
+  document.querySelector(".login-form").innerHTML = `
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>`
+}
+
+function renderLogged(name) {
+  document.querySelector(".login-form").innerHTML =
+    `<p>Logged in as <strong>${name}</strong></p>
+     <button onclick="logout()">Sign out</button>`
+}
+
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(()=>t.remove(),5000);
+  setTimeout(() => t.remove(), 5000);
 }
 
 let pollingId=null
@@ -150,8 +215,8 @@ function startPromoPolling(userId){
       ;(await r.json()).forEach(p=>
         toast(`🔥 Cruise ${p.cruise_id}: new price $${p.promotion_value}`)
       )
-    }catch(e){console.error(e)}
-  },3000)
+    } catch (e) { console.error(e) }
+  }, 3000)
 }
 
 window.addEventListener("DOMContentLoaded",()=>{
