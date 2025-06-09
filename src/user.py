@@ -69,7 +69,7 @@ class User(threading.Thread):
             return out
 
     def setup_promo_consumer(self):
-        queue = globalVars.PROMOTION_QUEUE_NAME
+        queue = f"{globalVars.PROMOTION_QUEUE_NAME}_ {self.user_id}"
         key   = globalVars.PROMOTIONS_ROUTING_KEY
         exch  = globalVars.PROMOTION_EXCHANGE_NAME
 
