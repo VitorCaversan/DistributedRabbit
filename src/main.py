@@ -26,8 +26,8 @@ ms_payment = MSPayment()
 ms_ticket  = MSTicket()
 ms_itineraries = MSItineraries()
 
-main_user   = None
-user_thread = None
+users = {}
+users_threads = {}
 
 @app.route("/") 
 def index():
@@ -37,9 +37,9 @@ def index():
 def databank(fname):
     return send_from_directory(DATA_DIR, fname)
 
-@app.route("/promos")
-def promos():
-    return jsonify(main_user.pop_promos() if main_user else [])
+@app.route("/promos/<int:user_id>")
+def promos(user_id):
+    return jsonify(users[user_id].pop_promos() if users.get(user_id) else [])
 
 @app.route("/reserve", methods=["POST"])
 def reserve():
@@ -81,9 +81,26 @@ def fetch_available_itineraries():
 
     return jsonify(itineraries), 200
 
+@app.route("/users/<int:user_id>/promotions", methods=["PUT"])
+def toggle_promotions(user_id):
+    # Expects JSON: { "wants_promo": true } or { "wants_promo": false }
+    body = request.get_json(force=True)
+    if "wants_promo" not in body:
+        return jsonify({"error": "missing wants_promo"}), 400
+
+    wants = bool(body["wants_promo"])
+
+    if users.get(user_id) is None or users[user_id].user_id != user_id:
+        return jsonify({"error": "user not logged in"}), 403
+    users[user_id].set_wants_promo(wants)
+
+    return jsonify({
+        "user_id":      user_id,
+        "wants_promo":  users[user_id].wants_promo
+    }), 200
+
 def start():
     httpd = make_server("0.0.0.0", gv.MAIN_PORT, app)
-
 
     threads = [
         threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1),
@@ -98,7 +115,9 @@ def start():
 
     def shutdown(*_):
         ms_reserve.stop(); ms_payment.stop(); ms_ticket.stop(); ms_itineraries.stop()
-        if main_user: main_user.stop()
+        for user in users.values():
+            if user is not None:
+                user.stop()
         try:
             socket.create_connection(("0.0.0.0", gv.MAIN_PORT), 1).close()
         except:
@@ -115,19 +134,20 @@ def start():
 
     for t in threads:
         t.join()
-    if user_thread:
-        user_thread.join()
+    for thread in users_threads.values():
+        if thread.is_alive():
+            thread.join()
     sys.exit(0)
 
 @app.route("/login", methods=["POST"])
 def login():
-    global main_user, user_thread
+    global users, users_threads
     uid = request.get_json().get("id", 0)
-    if uid and main_user is None:
-        main_user   = User(user_id=uid)
-        user_thread = threading.Thread(target=main_user.run, daemon=True)
-        user_thread.start()
-    return (jsonify(status="success") if main_user
+    if uid and users.get(uid) is None:
+        users[uid]  = User(user_id=uid)
+        users_threads[uid] = threading.Thread(target=users[uid].run, daemon=True)
+        users_threads[uid].start()
+    return (jsonify(status="success") if users[uid]
             else (jsonify(status="error", error="User could not be created"), 404))
 
 if __name__ == "__main__":

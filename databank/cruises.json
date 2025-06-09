@@ -1,7 +1,7 @@
 {
   "itineraries": [
     {
-      "id": 5,
+      "id": 1,
       "ship": "Test Land",
       "departure_dates": [
         "12/12/1234",
@@ -15,11 +15,11 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 123,
+      "price": 345,
       "available_cabins": 100
     },
     {
-      "id": 6,
+      "id": 2,
       "ship": "Poor Test Land",
       "departure_dates": [
         "12/12/1234",
@@ -33,7 +33,7 @@
         "Pluton"
       ],
       "nights": 12,
-      "price": 1100,
+      "price": 456,
       "available_cabins": 7
     }
   ]
