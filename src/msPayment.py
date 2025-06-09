@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify
 from msReserve import ReservationRequest
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 import globalVars as gv
+import requests
 
 class MSPayment:
     def __init__(self, host='localhost'):
@@ -67,6 +68,28 @@ class MSPayment:
             self.connection.add_callback_threadsafe(_publish)
             return jsonify({"status": "ok"})
 
+        # NOVAS ROTAS PARA INTERFACE EXTERNA DE PAGAMENTO
+        @self.app.route("/pay/<int:rid>/confirm", methods=["POST"])
+        def pay_confirm(rid):
+            # Simula confirmação, chama o próprio webhook interno
+            url = f"http://localhost:{gv.PAYMENT_INTERNAL_PORT}/payment_webhook"
+            data = {"reserve_id": rid, "status": "APPROVED"}
+            try:
+                requests.post(url, json=data)
+            except Exception as e:
+                print(f"[Payment MS] Erro ao chamar webhook: {e}")
+            return '', 204
+
+        @self.app.route("/pay/<int:rid>/deny", methods=["POST"])
+        def pay_deny(rid):
+            # Simula recusa, chama o próprio webhook interno
+            url = f"http://localhost:{gv.PAYMENT_INTERNAL_PORT}/payment_webhook"
+            data = {"reserve_id": rid, "status": "DENIED"}
+            try:
+                requests.post(url, json=data)
+            except Exception as e:
+                print(f"[Payment MS] Erro ao chamar webhook: {e}")
+            return '', 204
 
     def _run_flask(self):
         self.app.run(host="0.0.0.0", port=gv.PAYMENT_INTERNAL_PORT, debug=False, use_reloader=False)
