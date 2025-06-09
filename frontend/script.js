@@ -133,7 +133,7 @@ async function login(){
   if(d.status!=="success"){alert(`Login failed: ${d.error}`);return}
   sessionStorage.setItem("loggedInUser",JSON.stringify(user))
   renderLogged(user.username, user.wants_promo)
-  startPromoPolling()
+  startPromoPolling(user.id)
 }
 
 function logout(){
@@ -183,11 +183,11 @@ function toast(msg) {
 }
 
 let pollingId=null
-function startPromoPolling(){
+function startPromoPolling(userId){
   if(pollingId) return
   pollingId=setInterval(async()=>{
     try{
-      const r=await fetch("http://127.0.0.1:5050/promos")
+      const r=await fetch(`http://127.0.0.1:5050/promos/${userId}`)
       if(!r.ok) return
       ;(await r.json()).forEach(p=>
         toast(`🔥 Cruise ${p.cruise_id}: new price $${p.promotion_value}`)
@@ -199,7 +199,11 @@ function startPromoPolling(){
 window.addEventListener("DOMContentLoaded",()=>{
     loadItineraries()
     const user=JSON.parse(sessionStorage.getItem("loggedInUser")||"null")
-    if(user){ renderLogged(user.username); startPromoPolling() }
+    if(user){
+      renderLogged(user.username);
+      startPromoPolling(user.id);
+      document.getElementById("promoToggleContainer").style.display = "block";
+      document.getElementById("promoToggle").checked = !!user.wants_promo; }
   })
 
 async function setUserPromotions(userId, wantsPromo) {
