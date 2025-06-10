@@ -5,6 +5,7 @@ import threading
 import pika
 from flask import Flask, request, jsonify
 from msReserve import ReservationRequest
+from wsgiref.simple_server import make_server
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 import globalVars as gv
 import requests
@@ -27,7 +28,9 @@ class MSPayment:
         # Inicia Flask na thread
         self.app = Flask("payment_ms_webhook")
         self._setup_routes()
-        self._flask_thread = threading.Thread(target=self._run_flask, daemon=True)
+        httpd = make_server("localhost", gv.PAYMENT_INTERNAL_PORT, self.app)
+        self._flask_thread = threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1),
+                         daemon=True, name="HTTP_payment")
 
     def _setup_routes(self):
         @self.app.route("/payment_webhook", methods=["POST"])
@@ -92,23 +95,16 @@ class MSPayment:
                 print(f"[Payment MS] Erro ao chamar webhook: {e}")
             return '', 204
 
-    def _run_flask(self):
-        self.app.run(host="0.0.0.0", port=gv.PAYMENT_INTERNAL_PORT, debug=False, use_reloader=False)
-
     def run(self):
         # Iniciar o webhook REST na thread
         self._flask_thread.start()
 
-        def on_created_reserve(ch, method, properties, body):
-            reservation = ReservationRequest(**json.loads(body.decode('utf-8')))
-            print(f"[Payment MS] Received: {body.decode('utf-8')}")
-            # NADA acontece aqui, só aguarda o webhook do serviço externo!
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-
+        self.channel.queue_declare(queue="__dummy__", durable=False, exclusive=True)
+        # A no-op callback just to keep start_consuming alive
         self.channel.basic_consume(
-            queue=gv.CREATED_RESERVE_Q_NAME,
-            on_message_callback=on_created_reserve,
-            auto_ack=False
+            queue="__dummy__",
+            on_message_callback=lambda ch, method, props, body: None,
+            auto_ack=True
         )
 
         try:

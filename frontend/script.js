@@ -16,23 +16,7 @@ async function loadItineraries() {
     }
     const data = await response.json();
 
-    let userReservations = [];
-    const loggedInUser = JSON.parse(sessionStorage.getItem("loggedInUser") || "null");
-    if (loggedInUser) {
-        try {
-            const usersResponse = await fetch("/databank/users.json");
-            const usersData = await usersResponse.json();
-            const user = usersData.users.find(u => u.id === loggedInUser.id);
-            if (user && Array.isArray(user.reservations)) {
-                userReservations = user.reservations.map(r => r.cruise_id);
-            }
-        } catch (e) {
-            // Se falhar, prossegue sem restrição extra (melhor experiência dev)
-            userReservations = [];
-        }
-    }
-
-    renderItineraries(data, userReservations);
+    renderItineraries(data);
 }
 
 /**
@@ -44,7 +28,7 @@ const formatDate = d => d && d.split("-").reverse().join("/");
  * Renderiza os itinerários e só mostra campos extras e botão Reserve se logado.
  * Se já tiver reserva para aquele cruzeiro, o botão fica desabilitado.
  */
-function renderItineraries(list, userReservations = []) {
+function renderItineraries(list) {
     const c = document.querySelector(".itineraries");
     c.innerHTML = "<h2>Cruise Itineraries</h2>";
     if (!list.length) {
@@ -61,21 +45,15 @@ function renderItineraries(list, userReservations = []) {
         let reserveButton = "";
 
         if (loggedInUser) {
-            const alreadyReserved = userReservations.includes(cruise.id);
-
-            if (alreadyReserved) {
-                reserveButton = `<button disabled title="You already have a reservation for this cruise!">Already Reserved</button>`;
-            } else {
-                extraFields = `
-                    <input type="number" min="1" max="${cruise.passenger_count}" 
-                        id="passenger_count_${cruise.id}" 
-                        placeholder="Number of Passengers" style="margin-right:8px;width:170px;">
-                    <input type="number" min="1" max="${cruise.available_cabins}" 
-                        id="cabins_${cruise.id}" 
-                        placeholder="Number of Cabins" style="margin-right:8px;width:150px;">
-                `;
-                reserveButton = `<button onclick='reserveCruise(${JSON.stringify(cruise)})'>Reserve</button>`;
-            }
+            extraFields = `
+                <input type="number" min="1" max="${cruise.passenger_count}" 
+                    id="passenger_count_${cruise.id}" 
+                    placeholder="Number of Passengers" style="margin-right:8px;width:170px;">
+                <input type="number" min="1" max="${cruise.available_cabins}" 
+                    id="cabins_${cruise.id}" 
+                    placeholder="Number of Cabins" style="margin-right:8px;width:150px;">
+            `;
+            reserveButton = `<button onclick='reserveCruise(${JSON.stringify(cruise)})'>Reserve</button>`;
         }
 
         c.insertAdjacentHTML("beforeend", `
@@ -102,6 +80,33 @@ function renderItineraries(list, userReservations = []) {
 }
 
 /**
+ * Pesquisa pelos itinerários filtrados.
+ */
+async function handleSearch() {
+    const dest = document.getElementById("destination").value.toLowerCase().trim();
+    const port = document.getElementById("embarkPort").value.toLowerCase().trim();
+    const date = formatDate(document.getElementById("departureDate").value.trim());
+
+    if (!dest || !port || !date) {
+        alert("Please fill in all fields.");
+        return;
+    }
+
+    const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
+    const url = new URL(baseUrl);
+    url.searchParams.append("dest", dest);
+    url.searchParams.append("embark_port", port);
+    url.searchParams.append("departure_date", date);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    renderItineraries(data);
+}
+
+/**
  * Efetua a reserva. Agora com checagem anti-duplicada extra.
  */
 async function reserveCruise(cruise) {
@@ -113,12 +118,12 @@ async function reserveCruise(cruise) {
         const usersResponse = await fetch("/databank/users.json");
         const usersData = await usersResponse.json();
         const user = usersData.users.find(u => u.id === loggedInUser.id);
-        if (user && Array.isArray(user.reservations)) {
-            if (user.reservations.some(r => r.cruise_id === cruise.id)) {
-                toast("Você já reservou esse cruzeiro!");
-                return;
-            }
-        }
+        // if (user && Array.isArray(user.reservations)) {
+        //     if (user.reservations.some(r => r.cruise_id === cruise.id)) {
+        //         toast("Você já reservou esse cruzeiro!");
+        //         return;
+        //     }
+        // }
     } catch (e) {
         // Se falhar, prossegue (mas é improvável)
     }
@@ -165,7 +170,7 @@ async function reserveCruise(cruise) {
         user_id: loggedInUser.id
     };
 
-    fetch("/reserve", {
+    fetch("http://127.0.0.1:5050/reserve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reservation)
@@ -185,12 +190,12 @@ async function reserveCruise(cruise) {
                     if (confirm("Reserva criada! Deseja ir para o pagamento agora?")) {
                         window.location.href = d.payment_url;
                     } else {
-                        window.location.href = `http://localhost:5050/reservation_status.html?id=${reservation.id}`;
+                        window.location.href = `http://127.0.0.1:5050/reservation_status.html?id=${reservation.id}`;
                     }
                 }, 900);
             } else {
                 toast("Reserva criada! Aguardando aprovação...");
-                window.location.href = `http://localhost:5050/reservation_status.html?id=${reservation.id}`;
+                window.location.href = `http://127.0.0.1:5050/reservation_status.html?id=${reservation.id}`;
             }
         })
         .catch(e => {

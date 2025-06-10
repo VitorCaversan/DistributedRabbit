@@ -13,7 +13,6 @@ app = Flask(__name__)
 @app.route("/itineraries", methods=["GET"])
 def get_itineraries():
     cruises_path = os.path.abspath('../databank/cruises.json')
-    print(f"[Itineraries MS] GET /itineraries lendo arquivo: {cruises_path}")
     with open(cruises_path, 'r') as file:
         data = json.load(file)
 
@@ -24,25 +23,20 @@ def get_itineraries():
     filtered = data.get('itineraries', [])
 
     if dest and dest.lower() == "all":
-        print(f"[Itineraries MS] Retornando todos os itinerários ({len(filtered)})")
         return jsonify(filtered), 200
     
     if dest:
         before = len(filtered)
         filtered = [it for it in filtered if (dest in it.get("visited_places", []))]
-        print(f"[Itineraries MS] Filtrando por destino '{dest}': {before} → {len(filtered)}")
 
     if embark_port is not None:
         before = len(filtered)
         filtered = [it for it in filtered if it.get("embark_port").lower() == embark_port.lower()]
-        print(f"[Itineraries MS] Filtrando por porto '{embark_port}': {before} → {len(filtered)}")
 
     if departure_date is not None:
         before = len(filtered)
         filtered = [it for it in filtered if (departure_date in it.get("departure_dates", []))]
-        print(f"[Itineraries MS] Filtrando por data '{departure_date}': {before} → {len(filtered)}")
 
-    print(f"[Itineraries MS] Retornando {len(filtered)} itinerários no final do filtro.")
     return jsonify(filtered), 200
 
 class MSItineraries:
