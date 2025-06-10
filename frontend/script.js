@@ -15,7 +15,24 @@ async function loadItineraries() {
         throw new Error(`HTTP ${response.status}`);
     }
     const data = await response.json();
-    renderItineraries(data);
+
+    let userReservations = [];
+    const loggedInUser = JSON.parse(sessionStorage.getItem("loggedInUser") || "null");
+    if (loggedInUser) {
+        try {
+            const usersResponse = await fetch("/databank/users.json");
+            const usersData = await usersResponse.json();
+            const user = usersData.users.find(u => u.id === loggedInUser.id);
+            if (user && Array.isArray(user.reservations)) {
+                userReservations = user.reservations.map(r => r.cruise_id);
+            }
+        } catch (e) {
+            // Se falhar, prossegue sem restrição extra (melhor experiência dev)
+            userReservations = [];
+        }
+    }
+
+    renderItineraries(data, userReservations);
 }
 
 /**
@@ -25,8 +42,9 @@ const formatDate = d => d && d.split("-").reverse().join("/");
 
 /**
  * Renderiza os itinerários e só mostra campos extras e botão Reserve se logado.
+ * Se já tiver reserva para aquele cruzeiro, o botão fica desabilitado.
  */
-function renderItineraries(list) {
+function renderItineraries(list, userReservations = []) {
     const c = document.querySelector(".itineraries");
     c.innerHTML = "<h2>Cruise Itineraries</h2>";
     if (!list.length) {
@@ -43,16 +61,21 @@ function renderItineraries(list) {
         let reserveButton = "";
 
         if (loggedInUser) {
-            // Campos só para usuário logado
-            extraFields = `
-                <input type="number" min="1" max="${cruise.available_cabins || 1}" 
-                    id="passenger_count_${cruise.id}" 
-                    placeholder="Number of Passengers" style="margin-right:8px;width:170px;">
-                <input type="number" min="1" max="${cruise.passanger_count || 1}" 
-                    id="cabins_${cruise.id}" 
-                    placeholder="Number of Cabins" style="margin-right:8px;width:150px;">
-            `;
-            reserveButton = `<button onclick='reserveCruise(${JSON.stringify(cruise)})'>Reserve</button>`;
+            const alreadyReserved = userReservations.includes(cruise.id);
+
+            if (alreadyReserved) {
+                reserveButton = `<button disabled title="You already have a reservation for this cruise!">Already Reserved</button>`;
+            } else {
+                extraFields = `
+                    <input type="number" min="1" max="${cruise.passenger_count}" 
+                        id="passenger_count_${cruise.id}" 
+                        placeholder="Number of Passengers" style="margin-right:8px;width:170px;">
+                    <input type="number" min="1" max="${cruise.available_cabins}" 
+                        id="cabins_${cruise.id}" 
+                        placeholder="Number of Cabins" style="margin-right:8px;width:150px;">
+                `;
+                reserveButton = `<button onclick='reserveCruise(${JSON.stringify(cruise)})'>Reserve</button>`;
+            }
         }
 
         c.insertAdjacentHTML("beforeend", `
@@ -67,6 +90,7 @@ function renderItineraries(list) {
                         <p><strong>Duration:</strong> ${cruise.nights} nights</p>
                         <p><strong>Price per person:</strong> $${cruise.price}</p>
                         <p><strong>Available Cabins:</strong> ${cruise.available_cabins || 0}</p>
+                        <p><strong>Max Passengers:</strong> ${cruise.passenger_count || 0}</p>
                     </div>
                     <div class="card-action">
                         ${extraFields}
@@ -78,40 +102,31 @@ function renderItineraries(list) {
 }
 
 /**
- * Pesquisa pelos itinerários filtrados.
+ * Efetua a reserva. Agora com checagem anti-duplicada extra.
  */
-async function handleSearch() {
-    const dest = document.getElementById("destination").value.toLowerCase().trim();
-    const port = document.getElementById("embarkPort").value.toLowerCase().trim();
-    const date = formatDate(document.getElementById("departureDate").value.trim());
+async function reserveCruise(cruise) {
+    const loggedInUser = JSON.parse(sessionStorage.getItem("loggedInUser") || "null");
+    if (!loggedInUser) return;
 
-    if (!dest || !port || !date) {
-        alert("Please fill in all fields.");
-        return;
+    // Checagem extra (protege contra tentativa manual/burlas no front)
+    try {
+        const usersResponse = await fetch("/databank/users.json");
+        const usersData = await usersResponse.json();
+        const user = usersData.users.find(u => u.id === loggedInUser.id);
+        if (user && Array.isArray(user.reservations)) {
+            if (user.reservations.some(r => r.cruise_id === cruise.id)) {
+                toast("Você já reservou esse cruzeiro!");
+                return;
+            }
+        }
+    } catch (e) {
+        // Se falhar, prossegue (mas é improvável)
     }
 
-    const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
-    const url = new URL(baseUrl);
-    url.searchParams.append("dest", dest);
-    url.searchParams.append("embark_port", port);
-    url.searchParams.append("departure_date", date);
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-    }
-    const data = await response.json();
-    renderItineraries(data);
-}
-
-/**
- * Efetua a reserva.
- */
-function reserveCruise(cruise) {
     const cruiseId = cruise.id;
     const availableCabins = cruise.available_cabins || 1;
+    const availablePassengers = cruise.passenger_count || 1;
 
-    // Tenta obter os valores dos inputs criados dinamicamente
     const passengerCountEl = document.getElementById(`passenger_count_${cruiseId}`);
     const cabinsEl = document.getElementById(`cabins_${cruiseId}`);
 
@@ -126,9 +141,12 @@ function reserveCruise(cruise) {
             toast("Por favor, preencha o número de passageiros e de cabines.");
             return;
         }
-
         if (cabins > availableCabins) {
             toast("Não há cabines suficientes disponíveis para este cruzeiro.");
+            return;
+        }
+        if (passenger_count > availablePassengers) {
+            toast("Não há passageiros suficientes disponíveis para este cruzeiro.");
             return;
         }
     }
@@ -144,7 +162,7 @@ function reserveCruise(cruise) {
         price: cruise.price,
         passenger_count: passenger_count,
         cabins: cabins,
-        user_id: JSON.parse(sessionStorage.getItem("loggedInUser") || "null")?.id || null
+        user_id: loggedInUser.id
     };
 
     fetch("/reserve", {
@@ -159,6 +177,7 @@ function reserveCruise(cruise) {
                 toast(`❌ Reservation error: ${d.error || d.details}`);
                 return;
             }
+            loadItineraries();
             if (d.payment_url) {
                 sessionStorage.setItem("lastPaymentUrl", d.payment_url);
                 toast("Reserva criada! Redirecionando para pagamento...");
@@ -181,9 +200,8 @@ function reserveCruise(cruise) {
         });
 }
 
-/**
- * Login/logout
- */
+// --- RESTANTE DAS FUNÇÕES (Login, logout, toast, promo, etc) ---
+
 async function login() {
     const u = document.getElementById("username").value;
     const p = document.getElementById("password").value;
@@ -199,7 +217,7 @@ async function login() {
     sessionStorage.setItem("loggedInUser", JSON.stringify(user));
     renderLogged(user.username, user.wants_promo);
     startPromoPolling(user.id);
-    loadItineraries(); // Atualiza os cards com campos/botões
+    loadItineraries();
 }
 
 function logout() {
@@ -211,7 +229,7 @@ function logout() {
         <button onclick="login()">Login</button>`;
     document.getElementById("promoToggleContainer").style.display = "none";
     document.getElementById("promoToggle").checked = 0;
-    loadItineraries(); // Atualiza os cards sem campos/botões
+    loadItineraries();
 }
 
 function renderLogged(name, wants_promo = false) {
@@ -222,9 +240,6 @@ function renderLogged(name, wants_promo = false) {
     document.getElementById("promoToggle").checked = !!wants_promo;
 }
 
-/**
- * Toast simples na tela.
- */
 function toast(msg) {
     const t = document.createElement("div");
     t.className = "toast";
@@ -233,9 +248,6 @@ function toast(msg) {
     setTimeout(() => t.remove(), 5000);
 }
 
-/**
- * Polling de promoções.
- */
 let pollingId = null;
 function startPromoPolling(userId) {
     if (pollingId) return;
@@ -250,9 +262,6 @@ function startPromoPolling(userId) {
     }, 3000);
 }
 
-/**
- * Atualiza itinerários e controles no load inicial.
- */
 window.addEventListener("DOMContentLoaded", () => {
     loadItineraries();
     const user = JSON.parse(sessionStorage.getItem("loggedInUser") || "null");
@@ -264,9 +273,6 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-/**
- * Atualiza promoções.
- */
 async function setUserPromotions(userId, wantsPromo) {
     const url = `http://127.0.0.1:5050/users/${userId}/promotions`;
     const resp = await fetch(url, {

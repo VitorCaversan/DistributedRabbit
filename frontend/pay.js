@@ -9,7 +9,7 @@ document.getElementById("payForm").addEventListener("submit", e => {
     fetch(`/pay/${rid}/${userId}/confirm`, { method: "POST" })
         .then(() => {
             alert("Pagamento confirmado!");
-            window.location.href = "reservation_status.html?id=" + rid;
+            window.location.href = "http://localhost:5050/reservation_status.html?id=" + rid;
         });
 });
 
@@ -18,6 +18,6 @@ document.getElementById("denyBtn").addEventListener("click", e => {
     fetch(`/pay/${rid}/${userId}/deny`, { method: "POST" })
         .then(() => {
             alert("Pagamento recusado!");
-            window.location.href = "reservation_status.html?id=" + rid;
+            window.location.href = "http://localhost:5050/reservation_status.html?id=" + rid;
         });
 });

@@ -7,6 +7,14 @@ FRONT_DIR = os.path.abspath(os.path.join(BASE_DIR, "../frontend"))
 
 app = Flask(__name__)
 
+@app.route("/pay.css")
+def pay_css():
+    return send_from_directory(FRONT_DIR, "pay.css")
+
+@app.route("/pay.js")
+def pay_js():
+    return send_from_directory(FRONT_DIR, "pay.js")
+
 @app.route("/generate_payment", methods=["POST"])
 def generate_payment():
     data = request.get_json()
