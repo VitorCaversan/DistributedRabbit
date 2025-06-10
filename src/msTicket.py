@@ -1,4 +1,4 @@
-# ms_reserve.py
+# ms_ticket.py
 from verif_signature import verify_sig, InvalidSignature
 import globalVars
 import json

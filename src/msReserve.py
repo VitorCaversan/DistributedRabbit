@@ -150,9 +150,14 @@ class MSReserve:
         )
 
     def publish_cancelled_reserve(self, cruise_id, user_id):
-        payload = {"cruise_id": cruise_id, "user_id": user_id,}
+        payload = {"cruise_id": cruise_id, "user_id": user_id}
         out_body = json.dumps(payload).encode('utf-8')
-        LOGGER.debug("Publishing reservation id=%s", cruise_id)
+        LOGGER.debug("Publishing cancelled reservation id=%s", cruise_id)
+        self.connection.add_callback_threadsafe(
+            partial(self._publish_cancelled_reserve, out_body)
+        )
+
+    def _publish_cancelled_reserve(self, out_body):
         self.channel.basic_publish(
             exchange="",
             routing_key=globalVars.CANCELLED_RESERVE_Q_NAME,

@@ -4,7 +4,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import requests
 import globalVars as gv
-
+import json
 from msReserve     import MSReserve, ReservationRequest
 from msPayment     import MSPayment
 from msTicket      import MSTicket
@@ -46,7 +46,6 @@ def reserve():
     data = request.get_json()
     reservation = ReservationRequest(**data)
     ms_reserve.reserve_cruise(reservation)
-    # Chama o serviço de pagamento mock (exemplo)
     resp = requests.post(f"http://localhost:{gv.PAYMENT_PORT}/generate_payment", json=asdict(reservation))
     if resp.status_code == 200:
         pay_data = resp.json()
@@ -157,6 +156,55 @@ def login():
         users_threads[uid].start()
     return (jsonify(status="success") if users[uid]
             else (jsonify(status="error", error="User could not be created"), 404))
+
+@app.route('/reserve/user/<int:user_id>', methods=['GET'])
+def get_user_reservations(user_id):
+    users_path = os.path.abspath('../databank/users.json')
+    cruises_path = os.path.abspath('../databank/cruises.json')
+
+    with open(users_path, 'r') as f:
+        users = json.load(f).get("users", [])
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return jsonify({"error": "Usuário não encontrado"}), 404
+
+    reservations = user.get("reservations", [])
+    if not reservations:
+        return jsonify([])
+
+    with open(cruises_path, 'r') as f:
+        cruises = {c["id"]: c for c in json.load(f).get("itineraries", [])}
+
+    reservas_detalhadas = []
+    for r in reservations:
+        cruise = cruises.get(r["cruise_id"])
+        if cruise:
+            reserva = {
+                "cruise_id": r["cruise_id"],
+                "ship": cruise["ship"],
+                "departure_dates": cruise["departure_dates"],
+                "embark_port": cruise["embark_port"],
+                "return_port": cruise["return_port"],
+                "visited_places": cruise["visited_places"],
+                "nights": cruise["nights"],
+                "price": cruise["price"],
+                "reserved_passengers": r["passenger_count"],
+                "reserved_cabins": r["cabins"]
+            }
+            reservas_detalhadas.append(reserva)
+
+    return jsonify(reservas_detalhadas)
+
+@app.route("/reserve/cancel", methods=["POST"])
+def cancel_reservation():
+    data = request.get_json(force=True)
+    cruise_id = data.get("cruise_id")
+    user_id = data.get("user_id")
+    if not cruise_id or not user_id:
+        return jsonify({"status": "error", "error": "Missing cruise_id or user_id"}), 400
+
+    ms_reserve.publish_cancelled_reserve(cruise_id=cruise_id, user_id=user_id)
+    return jsonify({"status": "success"})
 
 if __name__ == "__main__":
     print(f"⇢  http://0.0.0.0:{gv.MAIN_PORT}/  (Ctrl-C para sair)")

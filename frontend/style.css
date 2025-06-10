@@ -176,7 +176,51 @@ header {
     border-radius: 8px;
     cursor: pointer;
 }
-  
+
+.card-action button, .cancel-btn {
+    background-color: #175EAD;
+    color: white;
+    border: none;
+    padding: 0.7em 1.2em;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+.card-action button:hover, .cancel-btn:hover {
+    background-color: #104573;
+}
+
+.reservation-card {
+    background-color: #eaf6ff;
+    margin-bottom: 1em;
+    box-shadow: 0 2px 6px rgba(34,82,122,0.12);
+    border: 1px solid #b8e0ff;
+}
+
+.user-reservations {
+    background-color: #C9E7FF;
+    padding: 1em;
+    border-radius: 12px;
+    width: 90%;
+    margin: 2em auto 1em auto;
+    box-sizing: border-box;
+}
+.user-reservations h2 {
+    margin-top: 0;
+}
+
+.reservation-card {
+    margin-bottom: 1.2em;
+    background-color: #eaf6ff;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(34,82,122,0.10);
+    border: 1px solid #b8e0ff;
+    padding: 1em 1.5em;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 .toast{
     position:fixed;bottom:1.5rem;right:1.5rem;
     background:#175EAD;color:#fff;font-weight:bold;
