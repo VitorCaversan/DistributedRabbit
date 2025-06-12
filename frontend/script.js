@@ -1,8 +1,5 @@
 let cruiseData = [];
 
-/**
- * Carrega itinerários e chama o render.
- */
 async function loadItineraries() {
     const baseUrl = "http://127.0.0.1:5050/reserve/itineraries";
     const url = new URL(baseUrl);
@@ -19,15 +16,8 @@ async function loadItineraries() {
     renderItineraries(data);
 }
 
-/**
- * Formata data yyyy-mm-dd para dd/mm/yyyy.
- */
 const formatDate = d => d && d.split("-").reverse().join("/");
 
-/**
- * Renderiza os itinerários e só mostra campos extras e botão Reserve se logado.
- * Se já tiver reserva para aquele cruzeiro, o botão fica desabilitado.
- */
 function renderItineraries(list) {
     const c = document.querySelector(".itineraries");
     c.innerHTML = "<h2>Cruise Itineraries</h2>";
@@ -106,9 +96,6 @@ async function handleSearch() {
     renderItineraries(data);
 }
 
-/**
- * Efetua a reserva. Agora com checagem anti-duplicada extra.
- */
 async function reserveCruise(cruise) {
     const loggedInUser = JSON.parse(sessionStorage.getItem("loggedInUser") || "null");
     if (!loggedInUser) return;
@@ -162,24 +149,16 @@ async function reserveCruise(cruise) {
         .then(r => r.json())
         .then(d => {
             if (!d.status || d.status === "error") {
-                alert(`Reservation error: ${d.error || d.details}`);
                 toast(`❌ Reservation error: ${d.error || d.details}`);
                 return;
             }
-            loadItineraries();
+
+            const reserveId = d.reserve_id ?? reservation.id;
+
             if (d.payment_url) {
-                sessionStorage.setItem("lastPaymentUrl", d.payment_url);
-                toast("Reserva criada! Redirecionando para pagamento...");
-                setTimeout(() => {
-                    if (confirm("Reserva criada! Deseja ir para o pagamento agora?")) {
-                        window.location.href = d.payment_url;
-                    } else {
-                        window.location.href = `http://127.0.0.1:5050/reservation_status.html?id=${reservation.id}`;
-                    }
-                }, 900);
+                window.location.href = d.payment_url;
             } else {
-                toast("Reserva criada! Aguardando aprovação...");
-                window.location.href = `http://127.0.0.1:5050/reservation_status.html?id=${reservation.id}`;
+                window.location.href = `/reservation_status.html?id=${reserveId}`;
             }
         })
         .catch(e => {

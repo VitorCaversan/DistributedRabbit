@@ -27,7 +27,6 @@ import globalVars
 
 app = Flask(__name__)
 app.config["REDIS_URL"] = "redis://localhost"
-sse.init_app(app)
 app.register_blueprint(sse, url_prefix='/stream')
 
 # --- logging -----------------------------------------------------------------
@@ -68,27 +67,20 @@ class MSReserve:
         )
         return "Reservation scheduled to publish"
 
-    def _publish_reservation(self, reservation):
-        """
-        Publica a reserva na fila de reservas criadas.
-        """
-        payload = asdict(reservation)
-        out_body = json.dumps(payload).encode('utf-8')
+    def _publish_reservation(self, reservation: ReservationRequest) -> None:
+        body = json.dumps(asdict(reservation)).encode()
         self.channel.basic_publish(
             exchange="",
             routing_key=globalVars.CREATED_RESERVE_Q_NAME,
-            body=out_body,
-            properties=pika.BasicProperties(
-                content_type="application/json"
-            )
+            body=body,
+            properties=pika.BasicProperties(content_type="application/json")
         )
         with self._lock:
-            self._status[reservation.id] = {
-                "reserve": "PENDING",
-                "payment": "PENDING",
-                "ticket": "PENDING"
-            }
-        LOGGER.info("Reserva publicada na fila: id=%s", reservation.id)
+            self._status[reservation.id] = {"reserve": "PENDING",
+                                            "payment": "PENDING",
+                                            "ticket" : "PENDING"}
+        self._publish_status(reservation.id)
+        LOGGER.info("Reserva publicada id=%s", reservation.id)
 
     def run(self):
         self._declare_topology()
@@ -117,6 +109,17 @@ class MSReserve:
     def stop(self):
         self.connection.add_callback_threadsafe(self.channel.stop_consuming)
 
+    def _publish_status(self, rid: int) -> None:
+        with self._lock:
+            payload = {"reserve_id": rid, **self._status[rid]}
+
+        with app.app_context():
+            sse.publish(
+                payload,
+                type="status",
+                channel=f"reserve-{rid}" 
+            )
+
     def _setup_connection(self):
         self.connection = pika.BlockingConnection(
             pika.ConnectionParameters(self.host)
@@ -137,7 +140,6 @@ class MSReserve:
         ):
             self.channel.queue_declare(queue=q)
 
-        # exchange + filas para pagamentos aprovados
         self.channel.exchange_declare(
             exchange=globalVars.APPROVED_PAYMENT_EXCHANGE,
             exchange_type="direct",
@@ -177,53 +179,61 @@ class MSReserve:
             body=out_body,
         )
 
-    def _on_approved_payment(self, ch, method, properties, body):
+    def _on_approved_payment(self, ch, method, props, body):
         try:
-            event = verify_sig(body, properties.headers or {})
+            evt = verify_sig(body, props.headers or {})
+            rid  = evt["reserve_id"]
+
             with self._lock:
-                st = self._status.setdefault(event["reserve_id"], {})
+                st = self._status.setdefault(rid, {})
                 st["reserve"] = "APPROVED"
                 st["payment"] = "APPROVED"
-                with app.app_context:
-                    sse.publish(st, type='publish')
-            LOGGER.info("[Reserve MS] verified: %s", event)
+
+            self._publish_status(rid)
+            LOGGER.info("[Reserve MS] payment OK %s", evt)
             ch.basic_ack(method.delivery_tag)
         except InvalidSignature:
-            LOGGER.error("[Reserve MS] Signature check failed")
+            LOGGER.error("[Reserve MS] bad signature")
             ch.basic_nack(method.delivery_tag, requeue=False)
 
-    def _on_denied_payment(self, ch, method, properties, body):
+
+    def _on_denied_payment(self, ch, method, props, body):
         try:
-            data = verify_sig(body, properties.headers or {})
-            self.publish_cancelled_reserve(cruise_id=data["reserve_id"], user_id=data["user_id"])
+            evt = verify_sig(body, props.headers or {})
+            rid = evt["reserve_id"]
+
+            self.publish_cancelled_reserve(cruise_id=rid, user_id=evt["user_id"])
+
             with self._lock:
-                st = self._status.setdefault(data["reserve_id"], {})
-                st["reserve"]  = "FAILED"
-                st["payment"]  = "DENIED"
-                with app.app_context:
-                    sse.publish(st, type='publish')
-            LOGGER.info("[Reserve MS] Received denial: %s", body.decode())
+                st = self._status.setdefault(rid, {})
+                st["reserve"] = "FAILED"
+                st["payment"] = "DENIED"
+
+            self._publish_status(rid)
+            LOGGER.info("[Reserve MS] payment DENIED %s", evt)
             ch.basic_ack(method.delivery_tag)
         except InvalidSignature:
-            LOGGER.error("[Reserve MS] Signature check failed")
+            LOGGER.error("[Reserve MS] bad signature")
             ch.basic_nack(method.delivery_tag, requeue=False)
+
 
     def _on_ticket_generated(self, ch, method, _props, body):
         try:
-            data = json.loads(body.decode())
-            reserve_id = data.get("reserve_id")
-        except json.JSONDecodeError:
-            reserve_id = None
+            rid = json.loads(body.decode())["reserve_id"]
+        except Exception:
+            rid = None
 
-        if reserve_id is not None:
+        if rid is not None:
             with self._lock:
-                st = self._status.setdefault(reserve_id, {})
-                st["ticket"] = "GENERATED"
-                with app.app_context:
-                    sse.publish(st, type='publish')
+                self._status.setdefault(rid, {})["ticket"] = "GENERATED"
+            self._publish_status(rid)
 
-        LOGGER.info("[Reserve MS] Ticket generated msg: %s", body.decode())
+        LOGGER.info("[Reserve MS] ticket gerado %s", body.decode())
         ch.basic_ack(method.delivery_tag)
+
+    def get_status(self, rid: int) -> dict | None:
+        with self._lock:
+            return self._status.get(rid)
 
     def _safe_close(self):
         if self.channel.is_open:

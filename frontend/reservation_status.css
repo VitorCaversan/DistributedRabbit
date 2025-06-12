@@ -110,3 +110,5 @@ header {
 .home-btn:hover {
     background: #3E8ED0;
 }
+
+.line.failed{ background: var(--red); }

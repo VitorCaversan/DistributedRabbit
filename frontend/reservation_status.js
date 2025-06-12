@@ -1,46 +1,57 @@
-const reserveId = new URLSearchParams(location.search).get("id");
-const POLL_INTERVAL = 2000;
+document.addEventListener("DOMContentLoaded", () => {
 
-const circle = step => document.querySelector(`.circle[data-step="${step}"]`);
-const line   = n    => document.getElementById(`line-${n}`);
+    const $        = sel => document.querySelector(sel);
+    const circle   = step => $(`.circle[data-step="${step}"]`);
+    const line     = n    => $(`#line-${n}`);
+    const spinner  = $("#spinner");
 
-function mark(step, state) {
-    const c = circle(step);
-    c.classList.remove("success", "failed");
-    if (state === "success") c.classList.add("success");
-    if (state === "failed")  c.classList.add("failed");
-}
+    function mark(step, state = "success") {
+        const c = circle(step);
+        if (!c) return;
+        c.classList.remove("success", "failed");
+        c.classList.add(state);
+    }
 
-function markLine(n, state) {
-    const l = line(n);
-    l.classList.toggle("success", state === "success");
-}
+    function markLine(n, state = "success") {
+        const l = line(n);
+        if (!l) return;
+        l.classList.remove("success", "failed");
+        l.classList.add(state);
+    }
 
-var source = new EventSource("{{ url_for('sse.stream') }}");
-source.addEventListener('publish', function(event) {
-    const data = JSON.parse(event.data);
+    function finish() {
+        spinner.hidden = true;
+        evtSource.close();
+    }
 
-    if (data.reserve === "APPROVED") { mark("reserve", "success"); markLine(1, "success"); }
-    if (data.reserve === "FAILED")   { mark("reserve", "failed");  stop(); return; }
+    spinner.hidden = false;
 
-    if (data.payment === "APPROVED") { mark("payment", "success"); markLine(2, "success"); }
-    if (data.payment === "DENIED")   { mark("payment", "failed");  stop(); return; }
+    const reserveId = new URLSearchParams(location.search).get("id");
+    const api = `/status/${reserveId}`;
+    const streamURL = `/stream?channel=reserve-${reserveId}`;
 
-    if (data.ticket === "GENERATED") { mark("ticket", "success");  stop(); return; }
-}, false);
-source.addEventListener('error', function(event) {
-    console.log("Error"+ event)
-    alert("Failed to connect to event stream. Is Redis running?");
-}, false);
+    fetch(api)
+    .then(r => r.ok ? r.json() : null)
+    .then(st => {
+        if (st) applyStatus(st);
+        spinner.hidden = !!st;
+    })
+    .catch(console.error);
 
-let timer;
-function start() {
-    document.getElementById("spinner").hidden = false;
-    timer = setInterval(poll, POLL_INTERVAL);
-}
-function stop() {
-    document.getElementById("spinner").hidden = true;
-    clearInterval(timer);
-}
+    const evt = new EventSource(streamURL);
+    evt.addEventListener("status", ev => applyStatus(JSON.parse(ev.data)));
+    evt.onerror = err => console.error("SSE error", err);
 
-start();
+    function applyStatus(st){
+        if (st.reserve === "APPROVED") { mark("reserve","success"); markLine(1); }
+        if (st.reserve === "FAILED")   { mark("reserve","failed");  markLine(1,"failed"); finish(); return; }
+
+        if (st.payment === "APPROVED") { mark("payment","success"); markLine(2); }
+        if (st.payment === "DENIED")   { mark("payment","failed");  markLine(2,"failed"); finish(); return; }
+
+        if (st.ticket  === "GENERATED"){ mark("ticket","success");  finish(); }
+    }
+
+    function finish(){ spinner.hidden = true; }
+
+});

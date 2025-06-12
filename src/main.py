@@ -54,8 +54,9 @@ def reserve():
     if resp.status_code == 200:
         pay_data = resp.json()
         return jsonify({
-            "status": "Reservation created and published!",
-            "payment_url": pay_data["payment_url"]
+            "status"     : "Reservation created and published!",
+            "payment_url": pay_data["payment_url"],
+            "reserve_id" : reservation.id            # <<< NOVO
         })
     else:
         return jsonify({"status": "error", "details": "Could not create payment link"}), 502
@@ -158,6 +159,11 @@ def start() -> None:
     for t in threads:
         t.join()
     sys.exit(0)
+
+@app.get("/status/<int:rid>")
+def current_status(rid: int):
+    st = ms_reserve.get_status(rid)
+    return (jsonify(st), 200) if st else (jsonify({"error": "not found"}), 404)
 
 @app.route("/login", methods=["POST"])
 def login():
