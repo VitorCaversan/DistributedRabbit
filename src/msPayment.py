@@ -72,29 +72,6 @@ class MSPayment:
             self.connection.add_callback_threadsafe(_publish)
             return jsonify({"status": "ok"})
 
-        # NOVAS ROTAS PARA INTERFACE EXTERNA DE PAGAMENTO
-        @self.app.route("/pay/<int:rid>/<int:user_id>/confirm", methods=["POST"])
-        def pay_confirm(rid, user_id):
-            # Simula confirmação, chama o próprio webhook interno
-            url = f"http://localhost:{gv.PAYMENT_INTERNAL_PORT}/payment_webhook"
-            data = {"reserve_id": rid, "user_id": user_id, "status": "APPROVED"}
-            try:
-                requests.post(url, json=data)
-            except Exception as e:
-                print(f"[Payment MS] Erro ao chamar webhook: {e}")
-            return '', 204
-
-        @self.app.route("/pay/<int:rid>/<int:user_id>/deny", methods=["POST"])
-        def pay_deny(rid, user_id):
-            # Simula recusa, chama o próprio webhook interno
-            url = f"http://localhost:{gv.PAYMENT_INTERNAL_PORT}/payment_webhook"
-            data = {"reserve_id": rid, "user_id": user_id, "status": "DENIED"}
-            try:
-                requests.post(url, json=data)
-            except Exception as e:
-                print(f"[Payment MS] Erro ao chamar webhook: {e}")
-            return '', 204
-
     def run(self):
         # Iniciar o webhook REST na thread
         self._flask_thread.start()

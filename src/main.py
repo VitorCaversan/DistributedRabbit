@@ -56,12 +56,6 @@ def reserve():
     else:
         return jsonify({"status": "error", "details": "Could not create payment link"}), 502
 
-@app.route("/status/<int:rid>")
-def status(rid):
-    st = ms_reserve.get_status(rid)
-    return (jsonify(st) if st
-            else (jsonify(error="unknown reservation"), 404))
-
 @app.route("/favicon.ico")
 def favicon():
     return "", 204

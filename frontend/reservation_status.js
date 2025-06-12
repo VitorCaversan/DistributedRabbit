@@ -16,22 +16,22 @@ function markLine(n, state) {
     l.classList.toggle("success", state === "success");
 }
 
-async function poll() {
-    try {
-        if (!reserveId) return;
-        const r = await fetch(`/status/${reserveId}`);
-        if (!r.ok) throw new Error(await r.text());
-        const d = await r.json();
+var source = new EventSource("{{ url_for('sse.stream') }}");
+source.addEventListener('publish', function(event) {
+    const data = JSON.parse(event.data);
 
-        if (d.reserve === "APPROVED") { mark("reserve", "success"); markLine(1, "success"); }
-        if (d.reserve === "FAILED")   { mark("reserve", "failed");  stop(); return; }
+    if (data.reserve === "APPROVED") { mark("reserve", "success"); markLine(1, "success"); }
+    if (data.reserve === "FAILED")   { mark("reserve", "failed");  stop(); return; }
 
-        if (d.payment === "APPROVED") { mark("payment", "success"); markLine(2, "success"); }
-        if (d.payment === "DENIED")   { mark("payment", "failed");  stop(); return; }
+    if (data.payment === "APPROVED") { mark("payment", "success"); markLine(2, "success"); }
+    if (data.payment === "DENIED")   { mark("payment", "failed");  stop(); return; }
 
-        if (d.ticket === "GENERATED") { mark("ticket", "success");  stop(); return; }
-    } catch (e) { console.error(e); }
-}
+    if (data.ticket === "GENERATED") { mark("ticket", "success");  stop(); return; }
+}, false);
+source.addEventListener('error', function(event) {
+    console.log("Error"+ event)
+    alert("Failed to connect to event stream. Is Redis running?");
+}, false);
 
 let timer;
 function start() {

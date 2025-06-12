@@ -9,7 +9,10 @@ no loop I/O dessa thread usando `add_callback_threadsafe`.
 
 import json, logging
 
+from flask import Flask, render_template, jsonify
+from flask_sse import sse
 from dataclasses import dataclass, asdict
+from wsgiref.simple_server import make_server
 from functools import partial
 import threading
 import pika
@@ -21,6 +24,11 @@ from pika.exceptions import (
 from verif_signature import verify_sig, InvalidSignature
 from msPromotions import MSPromotions
 import globalVars
+
+app = Flask(__name__)
+app.config["REDIS_URL"] = "redis://localhost"
+sse.init_app(app)
+app.register_blueprint(sse, url_prefix='/stream')
 
 # --- logging -----------------------------------------------------------------
 logging.basicConfig(level=logging.ERROR)
@@ -115,6 +123,11 @@ class MSReserve:
         )
         self.channel = self.connection.channel()
 
+        httpd = make_server("localhost", globalVars.RESERVER_PORT, app)
+        print(f"[Reserve MS] HTTP API listening on :{globalVars.RESERVER_PORT}")
+        threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1),
+                         daemon=True, name="HTTP_itineraries").start()
+
     def _declare_topology(self):
         for q in (
             globalVars.DENIED_PAYMENT_NAME,
@@ -171,6 +184,8 @@ class MSReserve:
                 st = self._status.setdefault(event["reserve_id"], {})
                 st["reserve"] = "APPROVED"
                 st["payment"] = "APPROVED"
+                with app.app_context:
+                    sse.publish(st, type='publish')
             LOGGER.info("[Reserve MS] verified: %s", event)
             ch.basic_ack(method.delivery_tag)
         except InvalidSignature:
@@ -185,6 +200,8 @@ class MSReserve:
                 st = self._status.setdefault(data["reserve_id"], {})
                 st["reserve"]  = "FAILED"
                 st["payment"]  = "DENIED"
+                with app.app_context:
+                    sse.publish(st, type='publish')
             LOGGER.info("[Reserve MS] Received denial: %s", body.decode())
             ch.basic_ack(method.delivery_tag)
         except InvalidSignature:
@@ -202,6 +219,8 @@ class MSReserve:
             with self._lock:
                 st = self._status.setdefault(reserve_id, {})
                 st["ticket"] = "GENERATED"
+                with app.app_context:
+                    sse.publish(st, type='publish')
 
         LOGGER.info("[Reserve MS] Ticket generated msg: %s", body.decode())
         ch.basic_ack(method.delivery_tag)
@@ -213,7 +232,3 @@ class MSReserve:
             self.connection.close()
         LOGGER.info("[Reserve MS] Connection closed.")
         print("[Reserve MS] Connection closed.")
-
-    def get_status(self, rid: int) -> dict | None:
-        with self._lock:
-            return self._status.get(rid)
