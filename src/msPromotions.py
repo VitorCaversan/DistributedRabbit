@@ -1,4 +1,4 @@
-# ms_reserve.py
+# ms_promotions.py
 import globalVars
 import json
 import pika

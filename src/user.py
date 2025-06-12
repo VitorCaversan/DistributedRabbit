@@ -1,10 +1,12 @@
 import json, threading, pika, globalVars
+from flask_sse import sse
 
 class User(threading.Thread):
 
-    def __init__(self, host="localhost", user_id=None):
+    def __init__(self, host="localhost", user_id=None, flask_app=None):
         super().__init__(daemon=True)
         self.user_id = user_id
+        self.flask_app = flask_app
         self._buf : list[dict] = []
         self._lock = threading.Lock()
 
@@ -61,6 +63,14 @@ class User(threading.Thread):
             json.dump(data, f, indent=2, ensure_ascii=False)
         _ch.basic_ack(delivery_tag=_m.delivery_tag)
         
+        with self.flask_app.app_context():
+            sse.publish(
+                {"cruise_id": cruise_id, "promotion_value": promotion_value},
+                type="promotion",
+                channel=f"user-{self.user_id}"
+            )
+
+
         print("[User] promo ->", body.decode())
 
     def pop_promos(self):

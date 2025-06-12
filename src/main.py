@@ -11,12 +11,16 @@ from msTicket      import MSTicket
 from msItineraries import MSItineraries
 from user          import User
 from dataclasses import asdict
+from flask_sse import sse 
 
 BASE_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 FRONT_DIR = os.path.join(BASE_DIR, "frontend")
 DATA_DIR  = os.path.join(BASE_DIR, "databank")
 
 app = Flask(__name__, static_folder=FRONT_DIR, static_url_path="")
+app.config["REDIS_URL"] = "redis://localhost:6379/0"
+app.register_blueprint(sse, url_prefix="/stream")
+
 CORS(app)
 
 MS_ITINERARIES_URL = f"http://localhost:{gv.ITINERARIES_PORT}/itineraries"
@@ -102,27 +106,45 @@ def toggle_promotions(user_id):
         "wants_promo":  users[user_id].wants_promo
     }), 200
 
-def start():
-    httpd = make_server("0.0.0.0", gv.MAIN_PORT, app)
+from werkzeug.serving import make_server
+
+def start() -> None:
+    """
+    Sobe o HTTP em modo *threaded* para que a conexão SSE não bloqueie
+    as outras requisições.  
+    Mantém o mesmo esquema de threads para os micro-services.
+    """
+    # servidor HTTP capaz de atender em paralelo
+    httpd = make_server("0.0.0.0",
+                        gv.MAIN_PORT,
+                        app,
+                        threaded=True)          # ← aqui está o segredo!
+
     threads = [
-        threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1), daemon=True, name="HTTP"),
-        threading.Thread(target=ms_reserve.run, daemon=True, name="MSReserve"),
-        threading.Thread(target=ms_payment.run, daemon=True, name="MSPayment"),
-        threading.Thread(target=ms_ticket.run,  daemon=True, name="MSTicket"),
-        threading.Thread(target=ms_itineraries.run,  daemon=True, name="MSItineraries"),
+        threading.Thread(target=httpd.serve_forever,
+                         daemon=True,
+                         name="HTTP"),
+        threading.Thread(target=ms_reserve.run,
+                         daemon=True,
+                         name="MSReserve"),
+        threading.Thread(target=ms_payment.run,
+                         daemon=True,
+                         name="MSPayment"),
+        threading.Thread(target=ms_ticket.run,
+                         daemon=True,
+                         name="MSTicket"),
+        threading.Thread(target=ms_itineraries.run,
+                         daemon=True,
+                         name="MSItineraries"),
     ]
     for t in threads:
         t.start()
 
     def shutdown(*_):
         ms_reserve.stop(); ms_payment.stop(); ms_ticket.stop(); ms_itineraries.stop()
-        for user in users.values():
-            if user is not None:
-                user.stop()
-        try:
-            socket.create_connection(("0.0.0.0", gv.MAIN_PORT), 1).close()
-        except:
-            pass
+        for u in users.values():
+            if u is not None:
+                u.stop()
         httpd.shutdown()
 
     signal.signal(signal.SIGINT, shutdown)
@@ -135,21 +157,21 @@ def start():
 
     for t in threads:
         t.join()
-    for thread in users_threads.values():
-        if thread.is_alive():
-            thread.join()
     sys.exit(0)
 
 @app.route("/login", methods=["POST"])
 def login():
-    global users, users_threads
-    uid = request.get_json().get("id", 0)
-    if uid and users.get(uid) is None:
-        users[uid]  = User(user_id=uid)
-        users_threads[uid] = threading.Thread(target=users[uid].run, daemon=True)
-        users_threads[uid].start()
-    return (jsonify(status="success") if users[uid]
-            else (jsonify(status="error", error="User could not be created"), 404))
+    uid = request.get_json(force=True).get("id")
+    if uid is None:
+        return jsonify(status="error", error="missing id"), 400
+
+    if uid not in users:
+        users[uid] = User(user_id=uid, flask_app=app)
+        t = threading.Thread(target=users[uid].run, daemon=True)
+        users_threads[uid] = t
+        t.start()
+
+    return jsonify(status="success")
 
 @app.route('/reserve/user/<int:user_id>', methods=['GET'])
 def get_user_reservations(user_id):

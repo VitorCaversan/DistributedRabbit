@@ -203,8 +203,7 @@ async function login() {
     if (d.status !== "success") { alert(`Login failed: ${d.error}`); return; }
     sessionStorage.setItem("loggedInUser", JSON.stringify(user));
     renderLogged(user.username, user.wants_promo);
-    startPromoPolling(user.id);
-
+    connectSSE(user.id);
     document.querySelector('.user-reservations').style.display = "block";
     await loadUserReservations();
     loadItineraries();
@@ -212,7 +211,10 @@ async function login() {
 
 function logout() {
     sessionStorage.removeItem("loggedInUser");
-    clearInterval(pollingId); pollingId = null;
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+    }
     document.querySelector(".login-form").innerHTML = `
         <input type="text" id="username" placeholder="Username">
         <input type="password" id="password" placeholder="Password">
@@ -243,32 +245,42 @@ function toast(msg) {
     setTimeout(() => t.remove(), 5000);
 }
 
-let pollingId = null;
-function startPromoPolling(userId) {
-    if (pollingId) return;
-    pollingId = setInterval(async () => {
-        try {
-            const r = await fetch(`http://127.0.0.1:5050/promos/${userId}`)
-            if (!r.ok) return;
-            (await r.json()).forEach(p =>
-                toast(`🔥 Cruise ${p.cruise_id}: new price $${p.promotion_value}`)
-            );
-        } catch (e) { console.error(e) }
-    }, 3000);
+let eventSource = null;
+
+function connectSSE(userId) {
+    if (eventSource) eventSource.close();
+
+    // prefixo “/stream” + query string; *não* duplique “/stream”
+    eventSource = new EventSource(`/stream?channel=user-${userId}`);
+
+    eventSource.addEventListener("promotion", ev => {
+        const d = JSON.parse(ev.data);
+        toast(`🔥 Cruise ${d.cruise_id}: new price $${d.promotion_value}`);
+        loadItineraries();
+    });
+
+    eventSource.onerror = e => console.error("SSE error:", e);
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+
+window.addEventListener("DOMContentLoaded", async () => {
     loadItineraries();
+
     const user = JSON.parse(sessionStorage.getItem("loggedInUser") || "null");
     if (user) {
+        await fetch("http://127.0.0.1:5050/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: user.id })
+        });
         renderLogged(user.username, user.wants_promo);
-        startPromoPolling(user.id);
+        connectSSE(user.id);
         document.getElementById("promoToggleContainer").style.display = "block";
         document.getElementById("promoToggle").checked = !!user.wants_promo;
-        document.querySelector('.user-reservations').style.display = "block";
+        document.querySelector(".user-reservations").style.display = "block";
         loadUserReservations();
     } else {
-        document.querySelector('.user-reservations').style.display = "none";
+        document.querySelector(".user-reservations").style.display = "none";
     }
 });
 

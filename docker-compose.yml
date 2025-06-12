@@ -5,8 +5,8 @@ services:
     image: rabbitmq:3-management
     container_name: cruise-rabbitmq
     ports:
-      - "5672:5672"       # AMQP protocol
-      - "15672:15672"     # Web UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: "guest"
       RABBITMQ_DEFAULT_PASS: "guest"
@@ -15,10 +15,20 @@ services:
     networks:
       - cruise-network
 
+  redis:
+    image: redis:7
+    container_name: cruise-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - cruise-network
+    volumes:
+      - redis_data:/data
+
 volumes:
   rabbitmq_data:
+  redis_data:
 
 networks:
   cruise-network:
     driver: bridge
-
